@@ -1318,8 +1318,8 @@ def page_learning():
     TOTAL      = 6
     idx       = st.session_state["example_index"]
 
-    if st.session_state.get("cache_version",0) < 12:
-        st.session_state["emails"]={}; st.session_state["cache_version"]=12
+    if st.session_state.get("cache_version",0) < 13:
+        st.session_state["emails"]={}; st.session_state["cache_version"]=13
 
     st.markdown(f"""<style>
 #MainMenu,header,footer{{visibility:hidden;}}
