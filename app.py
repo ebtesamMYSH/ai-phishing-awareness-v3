@@ -182,8 +182,8 @@ ROLE_MAP = {
         "clinical"
     ),
     "إداري / إدارة": (
-        "مدير إداري في منظمة صحية",
-        "نظام الموارد البشرية وكشوف الرواتب وإدارة الموظفين والمشتريات",
+        "موظف إداري في مستشفى (سكرتارية طبية، استقبال، إدارة ملفات المرضى، التأمين الصحي، الفوترة الطبية)",
+        "ملفات المرضى وحجز المواعيد والتأمين الصحي والفوترة الطبية وسكرتارية الأطباء وإدارة المستشفى والمشتريات الطبية",
         "admin"
     ),
     "تقنية المعلومات / المعلوماتية": (
@@ -197,8 +197,8 @@ ROLE_MAP = {
         "clinical"
     ),
     "Admin / Management": (
-        "an administrative manager in healthcare",
-        "HR portal, payroll, staff policies, procurement systems",
+        "a healthcare administrative staff (medical secretary, receptionist, patient records manager, insurance coordinator, billing specialist)",
+        "patient files, appointment scheduling, medical insurance, hospital billing, doctor's secretary, hospital management, medical procurement",
         "admin"
     ),
     "IT / Informatics": (
@@ -461,28 +461,76 @@ def build_prompt(role, index, language):
 
     # ── Pick attack type by index to guarantee variety ──────────
     clinical_attacks = [
-        ("fake EMR login link",           "link",  "http://hosp1tal-emr.fake-login.net/update"),
-        ("malicious patient data PDF",    "pdf",   ""),
-        ("fake Ministry of Health alert", "link",  "http://moh-compliance.fake-check.com/verify"),
-        ("malicious clinical Excel file", "xlsx",  ""),
-        ("medical director impersonation","social",""),
-        ("fake pharmacy system update",   "link",  "http://pharma-system.hosp1tal-updates.xyz/login"),
+        ("fake EMR login credentials link",              "link",   "http://hosp1tal-emr.fake-login.net/update"),
+        ("malicious patient lab results PDF",            "pdf",    ""),
+        ("fake Ministry of Health compliance alert",     "link",   "http://moh-compliance.fake-check.com/verify"),
+        ("malicious clinical staff schedule Excel",      "xlsx",   ""),
+        ("medical director impersonation patient data",  "social", ""),
+        ("fake pharmacy system update link",             "link",   "http://pharma-system.hosp1tal-updates.xyz/login"),
+        ("malicious clinical protocol Word document",    "docx",   ""),
+        ("fake medical device alert link",               "link",   "http://meddevice.hosp1tal-alert.fake/login"),
+        ("malicious patient roster Excel file",          "xlsx",   ""),
+        ("fake nurse scheduling system login",           "link",   "http://nursing-schedule.hosp1tal.fake/login"),
+        ("malicious vaccination record PDF",             "pdf",    ""),
+        ("fake hospital CEO urgent clinical request",    "social", ""),
+        ("fake infection control alert link",            "link",   "http://infection-control.hosp1tal-safety.fake/report"),
+        ("malicious blood bank report Excel",            "xlsx",   ""),
+        ("fake telemedicine platform login link",        "link",   "http://teleclinic.hosp1tal-portal.fake/login"),
+        ("malicious surgical checklist Word doc",        "docx",   ""),
+        ("fake patient transfer authorization PDF",      "pdf",    ""),
+        ("fake clinical training enrollment link",       "link",   "http://cme-training.hosp1tal-edu.fake/enroll"),
+        ("fake department head impersonation request",   "social", ""),
+        ("malicious ICU patient data Excel",             "xlsx",   ""),
     ]
     admin_attacks = [
-        ("fake payroll system login link","link",  "http://hr-payroll.hosp1tal-portal.net/login"),
-        ("malicious HR policy PDF",       "pdf",   ""),
-        ("CEO impersonation urgent wire", "social",""),
-        ("malicious budget Excel file",   "xlsx",  ""),
-        ("fake vendor invoice",           "link",  "http://vendor-invoice.hospital-billing.fake/pay"),
-        ("fake license renewal link",     "link",  "http://license-renew.ministry-health.fake/update"),
+        # استقبال وحجز المواعيد
+        ("fake patient appointment system login link",        "link",   "http://appointments.hosp1tal-portal.net/login"),
+        ("fake patient registration portal update",           "link",   "http://patient-reg.hosp1tal-system.fake/update"),
+        # التأمين الصحي والفوترة
+        ("malicious health insurance claim approval PDF",     "pdf",    ""),
+        ("fake insurance portal login link",                  "link",   "http://insurance.health-billing.fake/login"),
+        ("malicious medical billing Excel spreadsheet",       "xlsx",   ""),
+        ("fake treatment pre-authorization link",             "link",   "http://preauth.insurance-hosp1tal.net/approve"),
+        # إدارة السجلات والملفات الطبية
+        ("malicious patient records transfer PDF request",    "pdf",    ""),
+        ("malicious patient discharge summary Excel",         "xlsx",   ""),
+        ("fake medical records access portal link",           "link",   "http://records.hosp1tal-archive.fake/access"),
+        # السكرتارية الطبية
+        ("doctor impersonation requesting patient file",      "social", ""),
+        ("malicious surgery schedule Word document",          "docx",   ""),
+        ("fake radiology report PDF with malware",            "pdf",    ""),
+        # المشتريات الطبية
+        ("fake medical supplier invoice link",                "link",   "http://medsupply.hosp1tal-procurement.fake/pay"),
+        ("malicious drug order Excel spreadsheet",            "xlsx",   ""),
+        ("fake medical equipment vendor offer PDF",           "pdf",    ""),
+        # إدارة المستشفى والامتثال
+        ("fake MOH quality audit compliance portal link",     "link",   "http://quality.moh-audit.fake/login"),
+        ("malicious hospital accreditation policy PDF",       "pdf",    ""),
+        ("fake hospital CEO impersonation urgent request",    "social", ""),
+        ("malicious staff performance review Excel",          "xlsx",   ""),
+        ("fake Joint Commission inspection alert link",       "link",   "http://jcia-inspect.hosp1tal-compliance.fake/verify"),
     ]
     it_attacks = [
-        ("fake VPN credentials link",     "link",  "http://vpn.hosp1tal-secure.net/login"),
-        ("malicious IT security PDF",     "pdf",   ""),
-        ("CIO impersonation server access","social",""),
-        ("malicious system access Excel", "xlsx",  ""),
-        ("fake SSL certificate alert",    "link",  "http://ssl-renew.hospital-it.fake/cert"),
-        ("fake firewall config request",  "link",  "http://firewall.hosp1tal-config.net/update"),
+        ("fake VPN credentials theft link",              "link",   "http://vpn.hosp1tal-secure.net/login"),
+        ("malicious IT security policy PDF",             "pdf",    ""),
+        ("CIO impersonation server credentials request", "social", ""),
+        ("malicious system access log Excel",            "xlsx",   ""),
+        ("fake SSL certificate expiry alert link",       "link",   "http://ssl-renew.hospital-it.fake/cert"),
+        ("fake firewall configuration request link",     "link",   "http://firewall.hosp1tal-config.net/update"),
+        ("malicious network audit Word document",        "docx",   ""),
+        ("fake cloud backup system login link",          "link",   "http://backup.hosp1tal-cloud.fake/login"),
+        ("malicious software license Excel file",        "xlsx",   ""),
+        ("fake IT helpdesk ticket link",                 "link",   "http://helpdesk.hosp1tal-it.fake/ticket"),
+        ("fake cybersecurity training enrollment link",  "link",   "http://security-training.hosp1tal-it.fake/enroll"),
+        ("malicious server configuration PDF",           "pdf",    ""),
+        ("fake hospital CISO urgent request",            "social", ""),
+        ("malicious asset inventory Excel",              "xlsx",   ""),
+        ("fake Microsoft 365 license renewal link",      "link",   "http://o365.hosp1tal-license.fake/renew"),
+        ("malicious endpoint security update link",      "link",   "http://endpoint.hosp1tal-security.fake/update"),
+        ("fake vendor support contract PDF",             "pdf",    ""),
+        ("malicious database backup Excel report",       "xlsx",   ""),
+        ("fake network monitoring alert link",           "link",   "http://monitor.hosp1tal-network.fake/alert"),
+        ("fake IT director impersonation request",       "social", ""),
     ]
     pools = {"clinical": clinical_attacks, "admin": admin_attacks, "it": it_attacks}
     attack_pool = pools.get(role_type, clinical_attacks)
@@ -655,19 +703,33 @@ def call_groq(prompt, max_tokens=1600):
     return call_ai(prompt, max_tokens)
 
 def parse_json_response(raw):
-    # Parses the LLM text response into a Python dictionary.
-    # Handles two common LLM formatting issues:
-    #   1. Markdown code fences: ```json ... ``` wrapping
-    #   2. Literal newlines inside JSON string values
-    # Strips control characters then uses fix_json_newlines()
-    # before calling json.loads().
+    # Step 1: strip markdown fences
     if "```" in raw:
-        raw = raw.split("```")[1]
+        parts = raw.split("```")
+        raw = parts[1] if len(parts) > 1 else parts[0]
         if raw.startswith("json"):
             raw = raw[4:]
-    raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', raw.strip())
+    raw = raw.strip()
+    # Step 2: strip control chars
+    raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', raw)
+    # Step 3: fix real newlines inside strings
     raw = fix_json_newlines(raw)
-    return json.loads(raw)
+    # Step 4: try direct parse
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    # Step 5: aggressive fix — extract first {...} block and sanitize
+    match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if match:
+        candidate = match.group(0)
+        # Replace unescaped single quotes inside string values with unicode equiv
+        candidate = re.sub(r"(?<=\w)'(?=\w)", "\u2019", candidate)
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+    raise json.JSONDecodeError("Cannot parse JSON", raw, 0)
 
 def clean_result(result, is_arabic):
     for f in ["body","suspicious_text","why_risky","learning_tip","subject","email_type"]:
@@ -1359,10 +1421,10 @@ def build_assess_prompt(role, index, is_phishing, language):
 
     # ── Pick attack by index for variety ────────────────────────
     clinical_p = ["fake EMR login link","malicious lab results PDF","fake MOH compliance alert","malicious patient roster Excel","medical director impersonation"]
-    admin_p    = ["fake payroll login link","malicious HR policy PDF","CEO impersonation financial wire","malicious budget Excel","fake vendor invoice link"]
+    admin_p    = ["fake hospital billing system login","malicious patient insurance PDF","fake medical director impersonation","malicious patient records Excel","fake MOH hospital compliance link"]
     it_p       = ["fake VPN login link","malicious IT security PDF","CIO impersonation server access","malicious asset inventory Excel","fake SSL certificate alert"]
     clinical_l = ["routine team meeting invite","scheduled IT maintenance notice","HR training notification","manager work update","official payslip notification"]
-    admin_l    = ["routine team meeting invite","IT maintenance notice","HR policy update","manager work update","vendor contract renewal"]
+    admin_l    = ["routine hospital admin meeting invite","IT maintenance for hospital systems","HR training for healthcare admin","department manager work update","official patient appointment system notice"]
     it_l       = ["routine IT team meeting","scheduled maintenance announcement","HR training notification","manager work update","software license renewal from verified vendor"]
 
     pools_p = {"clinical":clinical_p,"admin":admin_p,"it":it_p}
