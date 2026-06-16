@@ -45,7 +45,7 @@ st.set_page_config(
 #   emails        : cache of AI-generated emails {index: email_dict}
 for k, v in [("language","English"),("page","home"),("role",""),
               ("example_index",0),("emails",{}),("difficulty","medium"),
-              ("user_name",""),("user_email","")]:
+              ("user_name",""),("user_email",""),("ai_provider","groq")]:
     if k not in st.session_state:
         st.session_state[k] = v
 
@@ -453,170 +453,183 @@ def get_shuffled_scenario_order():
 # Returns a string prompt ready to send to the LLM.
 # =============================================================
 def build_prompt(role, index, language):
-    order   = get_shuffled_scenario_order()
-    sc_idx  = order[index % len(order)]
-    scenario = PHISHING_SCENARIOS[sc_idx]
-    is_ar   = (language == "Arabic")
-
-    role_info = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
+    # =============================================================
+    # AI PROMPT BUILDER - LEARNING PHASE (FREE GENERATION)
+    # -------------------------------------------------------------
+    # Changed from v2: No fixed scenario types.
+    # The AI now freely chooses the attack type based on:
+    #   1. Role    (clinical / admin / IT)
+    #   2. Difficulty (easy / medium / hard)
+    #   3. Language   (Arabic / English)
+    # This guarantees different scenarios every session.
+    # =============================================================
+    is_ar     = (language == "Arabic")
+    difficulty = st.session_state.get("difficulty", "medium")
+    role_info  = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
     role_desc, role_ctx, role_type = role_info
 
-    sc_desc  = get_role_scenario_desc(scenario["key"], role_type, is_ar)
-    sc_type  = scenario["ar_type"] if is_ar else scenario["en_type"]
-    has_link = scenario.get("has_link", False)
-    has_att  = scenario.get("has_attachment", False)
-    att_ext  = scenario.get("attachment_ext", "")
+    # ── Role-specific attack pool (guides AI choices) ──────────
+    role_attacks = {
+        "clinical": (
+            "credential theft via fake EMR/hospital system login link, "
+            "malicious PDF (patient data, lab results, clinical protocol), "
+            "malicious Excel (staff schedule, patient roster), "
+            "malicious Word doc with macro (clinical guidelines), "
+            "fake Ministry of Health compliance alert, "
+            "medical director impersonation requesting patient data, "
+            "fake pharmacy system update, fake medical device alert, "
+            "fake insurance system login, fake clinical training enrollment"
+        ),
+        "admin": (
+            "payroll system credential theft link, "
+            "malicious PDF (HR policy, payroll report, audit request), "
+            "malicious Excel (employee data form, budget approval), "
+            "malicious Word doc with macro (contract, HR update), "
+            "CEO/director impersonation requesting financial transaction, "
+            "fake vendor invoice, fake employee benefits enrollment, "
+            "fake procurement portal, fake license renewal, "
+            "fake board meeting invite, fake ministry compliance notice"
+        ),
+        "it": (
+            "VPN credential theft link, "
+            "fake server security update link, "
+            "fake SSL certificate expiry alert, "
+            "malicious PDF (IT security policy, software license), "
+            "malicious Excel (asset inventory, system access log), "
+            "CIO/IT director impersonation requesting server credentials, "
+            "fake IT helpdesk ticket, fake firewall config request, "
+            "fake cloud storage link, fake backup system alert, "
+            "fake network monitoring alert"
+        )
+    }
+    attacks = role_attacks.get(role_type, role_attacks["clinical"])
 
-    # Difficulty level rules
-    difficulty = st.session_state.get("difficulty", "medium")
+    # ── Difficulty rules ────────────────────────────────────────
     if difficulty == "easy":
         diff_rule = (
-            "DIFFICULTY LEVEL: BEGINNER — The phishing signs MUST be very obvious and easy to spot.\n"
-            "REQUIRED for easy level:\n"
-            "1. DOMAIN: Use a clearly fake domain with obvious misspelling or unrelated words "
-            "(e.g. hosp1tal-updates.xyz, hospital-secure-login.totally-fake.net, free-hospital-update.com)\n"
-            "2. SPELLING: Include 2-3 obvious spelling/grammar mistakes in the body\n"
-            "3. URGENCY: Use aggressive all-caps urgency (e.g. URGENT ACTION REQUIRED, ACT NOW, IMMEDIATE RESPONSE NEEDED)\n"
-            "4. GREETING: Use generic impersonal greeting ONLY — 'Dear Staff' or 'Dear User', never use the recipient name\n"
-            "5. REQUEST: Make an obviously suspicious request (e.g. share your password, confirm your full credentials)\n"
-            "The goal: even a non-technical person should easily identify this as phishing."
+            "DIFFICULTY: BEGINNER — signs must be VERY obvious and easy to spot.\n"
+            "- Domain: clearly fake (e.g. hosp1tal-updates.xyz, hospital-login.totally-fake.net)\n"
+            "- Include 2-3 obvious spelling/grammar mistakes in the body\n"
+            "- Urgency: aggressive ALL-CAPS (URGENT ACTION REQUIRED, ACT NOW)\n"
+            "- Greeting: generic only — 'Dear Staff' or 'Dear User', never use recipient name\n"
+            "- Request: obviously suspicious (share your password, confirm full credentials)\n"
+            "Goal: even a non-technical person easily identifies this as phishing."
         ) if not is_ar else (
-            "مستوى الصعوبة: مبتدئ — علامات التصيد يجب أن تكون واضحة جداً وسهلة الاكتشاف.\n"
-            "المطلوب للمستوى المبتدئ:\n"
-            "1. النطاق: استخدم نطاقاً مزيفاً واضحاً مثل (hosp1tal-updates.xyz أو hospital-login.totally-fake.net)\n"
-            "2. الأخطاء: أضف 2-3 أخطاء إملائية أو نحوية واضحة في نص الرسالة\n"
-            "3. الإلحاح: استخدم إلحاحاً قوياً ومبالغاً فيه مثل (تصرف الآن فوراً! موعد نهائي اليوم!)\n"
-            "4. التحية: تحية عامة فقط مثل 'عزيزي الموظف' أو 'إلى الكادر الصحي' — لا تستخدم اسم المستلم أبداً\n"
-            "5. الطلب: اجعل الطلب مشبوهاً بشكل واضح مثل (شارك كلمة المرور، أدخل بياناتك الكاملة)\n"
-            "الهدف: أي شخص حتى غير متخصص يجب أن يتعرف على هذا كتصيد بسهولة."
+            "مستوى الصعوبة: مبتدئ — العلامات يجب أن تكون واضحة جداً وسهلة الاكتشاف.\n"
+            "- النطاق: مزيف بشكل واضح (مثل hosp1tal-updates.xyz أو hospital-login.totally-fake.net)\n"
+            "- أضف 2-3 أخطاء إملائية أو نحوية واضحة في نص الرسالة\n"
+            "- الإلحاح: مبالغ فيه (تصرف الآن فوراً! موعد نهائي اليوم!)\n"
+            "- التحية: عامة فقط مثل 'عزيزي الموظف' — لا تستخدم اسم المستلم أبداً\n"
+            "- الطلب: مشبوه بشكل صريح (شارك كلمة المرور، أدخل بياناتك الكاملة)\n"
+            "الهدف: أي شخص حتى غير متخصص يتعرف على التصيد بسهولة."
         )
     elif difficulty == "hard":
         diff_rule = (
-            "DIFFICULTY LEVEL: ADVANCED — The phishing signs must be very subtle and hard to detect.\n"
-            "REQUIRED for advanced level:\n"
-            "1. DOMAIN: Use a nearly legitimate domain — very close to real hospital domain with minor change "
-            "(e.g. hospital-org.net, hosp1tal.org, hospital.org.co, hospital-hq.com — NOT obviously fake)\n"
-            "2. LANGUAGE: Perfect professional English, zero grammar/spelling errors, polished formal tone\n"
-            "3. URGENCY: Subtle and professional — 'We kindly request your attention by end of business today'\n"
-            "4. GREETING: Use the recipient's actual name and title from the 'To' field\n"
-            "5. CONTENT: Make the email look nearly identical to a real internal hospital communication — "
-            "plausible reason, correct terminology, realistic context\n"
-            "6. RED FLAGS: Only ONE subtle red flag (the domain or a slightly unusual request) — everything else looks legitimate\n"
-            "The goal: even an experienced employee might hesitate before identifying this as phishing."
+            "DIFFICULTY: ADVANCED — signs must be very SUBTLE and hard to detect.\n"
+            "- Domain: nearly legitimate with tiny change (e.g. hosp1tal.org, hospital-org.net, hospital.org.co)\n"
+            "- Perfect professional language, zero grammar/spelling errors\n"
+            "- Urgency: subtle and polite ('We kindly request your attention by end of business today')\n"
+            "- Greeting: use recipient's full name and title\n"
+            "- Content: nearly identical to a real internal hospital email — plausible reason, correct terminology\n"
+            "- Only ONE subtle red flag — everything else looks completely legitimate\n"
+            "Goal: even an experienced employee might hesitate."
         ) if not is_ar else (
-            "مستوى الصعوبة: متقدم — علامات التصيد يجب أن تكون خفية جداً وصعبة الاكتشاف.\n"
-            "المطلوب للمستوى المتقدم:\n"
-            "1. النطاق: استخدم نطاقاً يشبه النطاق الحقيقي تقريباً مع تغيير بسيط جداً "
-            "(مثل hospital-org.net أو hosp1tal.org أو hospital.org.co) — ليس مزيفاً بشكل واضح\n"
-            "2. اللغة: عربية فصحى سليمة تماماً، أسلوب مهني راقٍ، صفر أخطاء\n"
-            "3. الإلحاح: خفيف ومهني مثل 'نرجو الاطلاع والرد قبل نهاية يوم العمل'\n"
-            "4. التحية: استخدم الاسم الكامل والمسمى الوظيفي للمستلم\n"
-            "5. المحتوى: اجعل الرسالة تبدو مطابقة للمراسلات الداخلية الحقيقية — سبب منطقي وتفاصيل واقعية\n"
-            "6. العلامات التحذيرية: علامة تحذيرية واحدة فقط وخفية (النطاق أو طلب غير معتاد قليلاً)\n"
-            "الهدف: حتى موظف ذو خبرة قد يتردد في تحديد هذه الرسالة كتصيد."
+            "مستوى الصعوبة: متقدم — العلامات يجب أن تكون خفية جداً وصعبة الاكتشاف.\n"
+            "- النطاق: يشبه الحقيقي مع تغيير بسيط جداً (مثل hosp1tal.org أو hospital-org.net)\n"
+            "- لغة مهنية سليمة تماماً، صفر أخطاء إملائية أو نحوية\n"
+            "- الإلحاح: خفيف ومهني ('نرجو الاطلاع والرد قبل نهاية يوم العمل')\n"
+            "- التحية: الاسم الكامل والمسمى الوظيفي للمستلم\n"
+            "- المحتوى: مطابق للمراسلات الداخلية الحقيقية — سبب منطقي وتفاصيل واقعية\n"
+            "- علامة تحذيرية واحدة فقط وخفية — كل شيء آخر يبدو حقيقياً\n"
+            "الهدف: حتى موظف ذو خبرة قد يتردد."
         )
-    else:  # medium
+    else:
         diff_rule = (
-            "DIFFICULTY LEVEL: INTERMEDIATE — moderate difficulty, realistic phishing.\n"
-            "REQUIRED for intermediate level:\n"
-            "1. DOMAIN: Slightly suspicious but not obviously fake (e.g. hospital-hr-portal.net, hospital-emr-update.com)\n"
-            "2. LANGUAGE: Mostly professional with 1 minor red flag in wording\n"
-            "3. URGENCY: Moderate — 'Please complete this by end of week'\n"
-            "4. GREETING: Semi-personal (e.g. 'Dear Dr. Ahmed' — uses title but maybe wrong name)\n"
-            "The goal: a careful person would notice something is off, but a busy person might miss it."
+            "DIFFICULTY: INTERMEDIATE — moderate difficulty, realistic phishing.\n"
+            "- Domain: slightly suspicious but not obviously fake (e.g. hospital-hr-portal.net)\n"
+            "- Mostly professional with 1 minor red flag in wording\n"
+            "- Urgency: moderate ('Please complete this by end of week')\n"
+            "- Greeting: semi-personal (uses title but maybe wrong name)\n"
+            "Goal: a careful person notices something is off, but a busy person might miss it."
         ) if not is_ar else (
             "مستوى الصعوبة: متوسط — صعوبة معتدلة، تصيد واقعي.\n"
-            "المطلوب للمستوى المتوسط:\n"
-            "1. النطاق: مشبوه نسبياً لكن ليس واضح الزيف (مثل hospital-hr-portal.net)\n"
-            "2. اللغة: مهنية في معظمها مع علامة تحذير واحدة في الصياغة\n"
-            "3. الإلحاح: معتدل مثل 'يرجى إكمال ذلك بنهاية الأسبوع'\n"
-            "4. التحية: شبه شخصية (مثل 'عزيزي الدكتور أحمد' — تستخدم اللقب لكن ربما باسم خاطئ)\n"
-            "الهدف: الشخص المنتبه سيلاحظ شيئاً غريباً، لكن الشخص المشغول قد يفوته."
+            "- النطاق: مشبوه نسبياً لكن ليس واضح الزيف (مثل hospital-hr-portal.net)\n"
+            "- مهني في معظمه مع علامة تحذيرية واحدة في الصياغة\n"
+            "- الإلحاح: معتدل ('يرجى إكمال ذلك بنهاية الأسبوع')\n"
+            "- التحية: شبه شخصية (تستخدم اللقب لكن ربما باسم خاطئ)\n"
+            "الهدف: الشخص المنتبه يلاحظ شيئاً غريباً، لكن الشخص المشغول قد يفوته."
         )
 
+    # ── Language rules ──────────────────────────────────────────
     if is_ar:
         lang_rule = (
             "قاعدة اللغة المطلقة — يجب الالتزام الكامل:\n"
             "1. كل كلمة في subject, body, suspicious_text, indicators, why_risky, learning_tip "
             "يجب أن تكون بالعربية الفصحى فقط — لا استثناء أبداً\n"
-            "2. الاستثناء الوحيد المسموح به: عناوين البريد الإلكتروني والروابط (http://...) تبقى باللاتينية فقط\n"
-            "3. ممنوع منعاً باتاً: أي حرف لاتيني داخل النصوص العربية بما فيها عناوين المؤشرات\n"
-            "4. أمثلة على الأخطاء المحظورة: 'طلب m عاجل' أو 'used-ت' أو 'HRالـ' — "
-            "الصح: 'طلب عاجل' أو 'استخدام' أو 'الموارد البشرية'\n"
+            "2. الاستثناء الوحيد: عناوين البريد الإلكتروني والروابط (http://...) تبقى باللاتينية\n"
+            "3. ممنوع: أي حرف لاتيني داخل النصوص العربية\n"
+            "4. أمثلة على الأخطاء المحظورة: 'طلب m عاجل' أو 'HRالـ' — الصح: 'طلب عاجل' أو 'الموارد البشرية'\n"
             "5. حقل 'to' يجب أن يكون البريد الإلكتروني فقط بدون أي نص عربي\n"
-            "6. أي كلمة تقنية إنجليزية اكتب مقابلها العربي الكامل: 'Excel' = 'إكسل'، 'PDF' = 'ملف PDF'"
+            "6. الكلمات التقنية: 'Excel'='إكسل'، 'PDF'='ملف PDF'، 'VPN'='الشبكة الافتراضية'"
         )
-    else:
-        lang_rule = "Write everything in English. Do not mix any Arabic or other foreign characters into English text."
-
-    if has_link:
-        link_rule = (
-            'CRITICAL: "suspicious_link" field MUST contain a realistic fake URL '
-            f'relevant to the role context, e.g.: http://hospital-{role_type}-portal.fake-domain.com/login '
-            'Do NOT leave empty. This URL MUST also appear verbatim in the body text.'
-        )
-    else:
-        link_rule = '"suspicious_link" must be an empty string "".'
-
-    if has_att:
-        att_rule = (
-            f'"attachment" must be a realistic role-relevant filename ending in {att_ext}, '
-            f'e.g.: role_document_2024{att_ext}'
-        )
-    else:
-        att_rule = '"attachment" must be an empty string "".'
-
-    if is_ar:
         from_ex  = "اسم المرسل <fake@suspicious-domain.com>"
         body_ex  = "نص الرسالة بالعربية الفصحى فقط"
-        ind_t_ex = "عنوان المؤشر بالعربية"
+        ind_t_ex = "عنوان المؤشر بالعربية الفصحى"
         ind_d_ex = "وصف تقني تفصيلي بالعربية الفصحى"
-        att_ex   = f"اسم_ملف{att_ext}" if has_att else ""
     else:
+        lang_rule = "Write everything in English only. Do not mix any Arabic or foreign characters."
         from_ex  = "Sender Name <fake@suspicious-domain.com>"
         body_ex  = "plain text email body in English"
-        ind_t_ex = "indicator title"
-        ind_d_ex = "detailed technical explanation"
-        att_ex   = f"realistic_filename{att_ext}" if has_att else ""
+        ind_t_ex = "indicator title in English"
+        ind_d_ex = "detailed technical explanation in English"
 
-    return f"""You are a cybersecurity educator creating phishing awareness training for healthcare staff.
+    # ── Session seed for variety ────────────────────────────────
+    seed = st.session_state.get("cache_version", random.randint(1000,9999))
 
-SCENARIO: {sc_type}
-INSTRUCTIONS: {sc_desc}
+    return f"""You are a cybersecurity educator creating phishing awareness training content for Saudi healthcare employees.
+
+YOUR TASK — LEARNING EXAMPLE #{index + 1} of 6:
+Generate a realistic phishing email targeting a healthcare employee.
 
 TARGET ROLE: {role_desc}
 WORK CONTEXT: {role_ctx}
 
+ATTACK TYPE — Choose freely and creatively from this pool (pick ONE that fits the role):
+{attacks}
+
+IMPORTANT: Each of the 6 learning examples must use a DIFFERENT attack type.
+Session seed (use for variety): {seed}-{index}
+
 {diff_rule}
 
 {lang_rule}
-{link_rule}
-{att_rule}
 
-CRITICAL RULES:
-- body: PLAIN TEXT ONLY, no HTML, use \\n for line breaks
-- "to" field: MUST be ONLY the email address: employee@hospital.org — NO Arabic text, NO other words
-- indicators: provide deep technical analysis, 3 indicators minimum
-- If has_link=True, the URL in suspicious_link MUST appear word-for-word in the body
+ATTACK FORMAT RULES:
+- If your chosen attack involves a suspicious link: include a realistic fake URL in both "suspicious_link" field AND in the body text verbatim
+- If your chosen attack involves a file attachment: put a realistic filename in "attachment" field (e.g. patient_data.pdf, staff_schedule.xlsx, policy_update.docx)
+- If pure social engineering (no link, no file): leave both "suspicious_link" and "attachment" as empty strings ""
+- body: PLAIN TEXT ONLY, use \\n for line breaks, no HTML
+- "to" field: ONLY the email address, no Arabic text
 
 Return ONLY valid JSON, no markdown fences:
 {{
-  "email_type": "{sc_type}",
+  "email_type": "{'نوع هجوم التصيد بالعربية' if is_ar else 'phishing attack type name'}",
   "from": "{from_ex}",
   "to": "employee@hospital.org",
-  "subject": "{'الموضوع بالعربية الفصحى' if is_ar else 'subject line'}",
-  "attachment": "{att_ex}",
+  "subject": "{'الموضوع بالعربية الفصحى' if is_ar else 'email subject line'}",
+  "attachment": "{'اسم_الملف.pdf أو فارغ' if is_ar else 'filename.ext or empty string'}",
   "body": "{body_ex}",
-  "suspicious_text": "{'العبارة العاجلة من النص' if is_ar else 'exact urgent phrase from body'}",
-  "suspicious_link": "{'http://fake-url.com/path إن وجد' if has_link else ''}",
+  "suspicious_text": "{'العبارة الأكثر إثارة للشك من النص' if is_ar else 'most suspicious phrase from the body'}",
+  "suspicious_link": "http://fake-url.com/path or empty string",
   "indicators": [
     {{"number": 1, "title": "{ind_t_ex}", "description": "{ind_d_ex}"}},
     {{"number": 2, "title": "{ind_t_ex}", "description": "{ind_d_ex}"}},
     {{"number": 3, "title": "{ind_t_ex}", "description": "{ind_d_ex}"}}
   ],
-  "why_risky": "{'فقرة تفصيلية تشرح الخطر' if is_ar else 'detailed risk explanation'}",
-  "learning_tip": "{'نصيحة عملية مفصلة' if is_ar else 'practical tip'}"
-}}"""
+  "why_risky": "{'فقرة تفصيلية تشرح لماذا هذه الرسالة خطيرة' if is_ar else 'detailed paragraph explaining why this email is dangerous'}",
+  "learning_tip": "{'نصيحة عملية مفصلة للموظف' if is_ar else 'practical tip for the employee'}"
+}}"
+"""
 
 # =============================================================
 # API COMMUNICATION LAYER
@@ -627,25 +640,108 @@ Return ONLY valid JSON, no markdown fences:
 # (Can be swapped to OpenAI or Anthropic Claude by changing
 #  the endpoint URL and response parsing in call_groq().)
 # =============================================================
+def call_ai(prompt, max_tokens=1600):
+    # =============================================================
+    # UNIFIED AI CALLER — supports 4 APIs for research comparison
+    # Selected via st.session_state["ai_provider"]:
+    #   "groq"      → Groq (LLaMA 3.3-70b)   — default / v3 baseline
+    #   "openai"    → ChatGPT (GPT-4o)        — most used globally
+    #   "anthropic" → Claude (claude-3-5-sonnet) — best writing quality
+    #   "gemini"    → Gemini (gemini-1.5-pro) — fastest growing
+    # All providers use temperature=0.85 for variety.
+    # =============================================================
+    provider = st.session_state.get("ai_provider", "groq")
+
+    # ── Groq (LLaMA 3.3-70b) ──────────────────────────────────
+    if provider == "groq":
+        resp = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Content-Type":  "application/json",
+                "Authorization": f"Bearer {os.environ.get('GROQ_API_KEY','')}"
+            },
+            json={
+                "model":       "llama-3.3-70b-versatile",
+                "max_tokens":  max_tokens,
+                "temperature": 0.85,
+                "messages":    [{"role": "user", "content": prompt}]
+            },
+            timeout=45
+        )
+        data = resp.json()
+        # normalise to {"choices":[{"message":{"content":...}}]}
+        return data
+
+    # ── OpenAI (GPT-4o) ────────────────────────────────────────
+    elif provider == "openai":
+        resp = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Content-Type":  "application/json",
+                "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY','')}"
+            },
+            json={
+                "model":       "gpt-4o",
+                "max_tokens":  max_tokens,
+                "temperature": 0.85,
+                "messages":    [{"role": "user", "content": prompt}]
+            },
+            timeout=60
+        )
+        return resp.json()
+
+    # ── Anthropic (Claude 3.5 Sonnet) ──────────────────────────
+    elif provider == "anthropic":
+        resp = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "Content-Type":      "application/json",
+                "x-api-key":         os.environ.get("ANTHROPIC_API_KEY", ""),
+                "anthropic-version": "2023-06-01"
+            },
+            json={
+                "model":      "claude-sonnet-4-6",
+                "max_tokens": max_tokens,
+                "messages":   [{"role": "user", "content": prompt}]
+            },
+            timeout=60
+        )
+        raw = resp.json()
+        # Convert Anthropic format → OpenAI-compatible format
+        if "content" in raw and len(raw["content"]) > 0:
+            text = raw["content"][0].get("text", "")
+            return {"choices": [{"message": {"content": text}}]}
+        return {"error": raw}
+
+    # ── Google Gemini (gemini-1.5-pro) ─────────────────────────
+    elif provider == "gemini":
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+        resp = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key}",
+            headers={"Content-Type": "application/json"},
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "maxOutputTokens": max_tokens,
+                    "temperature":     0.85
+                }
+            },
+            timeout=60
+        )
+        raw = resp.json()
+        # Convert Gemini format → OpenAI-compatible format
+        try:
+            text = raw["candidates"][0]["content"]["parts"][0]["text"]
+            return {"choices": [{"message": {"content": text}}]}
+        except (KeyError, IndexError):
+            return {"error": raw}
+
+    else:
+        return {"error": f"Unknown provider: {provider}"}
+
+# Keep old name as alias for backwards compatibility
 def call_groq(prompt, max_tokens=1600):
-    # Sends a prompt to the Groq API and returns the raw response.
-    # temperature=0.85 adds slight randomness for varied outputs.
-    # timeout=45 seconds prevents hanging on slow responses.
-    resp = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Content-Type":  "application/json",
-            "Authorization": f"Bearer {os.environ.get('GROQ_API_KEY','')}"
-        },
-        json={
-            "model":       "llama-3.3-70b-versatile",
-            "max_tokens":  max_tokens,
-            "temperature": 0.85,
-            "messages":    [{"role": "user", "content": prompt}]
-        },
-        timeout=45
-    )
-    return resp.json()
+    return call_ai(prompt, max_tokens)
 
 def parse_json_response(raw):
     # Parses the LLM text response into a Python dictionary.
@@ -1142,6 +1238,32 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
+        # ── Researcher Mode: AI Provider selector (hidden from normal users) ──
+        # Access via: ?mode=researcher in the URL
+        if st.query_params.get("mode") == "researcher":
+            st.markdown('<div style="height:.5rem"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:.75rem;font-weight:800;color:#F59E0B;letter-spacing:.06em;margin-bottom:.5rem;direction:{dir_attr};">🔬 RESEARCHER MODE — AI Provider</div>', unsafe_allow_html=True)
+            provider_options = {
+                "groq":      "🟠 Groq  (LLaMA 3.3-70b) — Baseline v3",
+                "openai":    "🟢 ChatGPT  (GPT-4o) — Most used globally",
+                "anthropic": "🟣 Claude  (claude-sonnet-4-6) — Best writing quality",
+                "gemini":    "🔵 Gemini  (1.5 Pro) — Fastest growing",
+            }
+            cur_provider = st.session_state.get("ai_provider", "groq")
+            prov_cols = st.columns(2)
+            prov_items = list(provider_options.items())
+            for i, (pk, plbl) in enumerate(prov_items):
+                with prov_cols[i % 2]:
+                    is_psel = cur_provider == pk
+                    pcss = "diff-btn diff-btn-sel" if is_psel else "diff-btn"
+                    st.markdown(f'<div class="{pcss}">', unsafe_allow_html=True)
+                    if st.button(plbl, key=f"prov_{pk}", use_container_width=True):
+                        st.session_state["ai_provider"] = pk
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:.72rem;color:#64748B;margin-top:.3rem;direction:{dir_attr};">Active: <b style="color:#F59E0B;">{provider_options.get(cur_provider,"")}</b></div>', unsafe_allow_html=True)
+            st.markdown('<div style="height:.5rem"></div>', unsafe_allow_html=True)
+
         st.markdown('<div class="start-btn" style="margin-top:.8rem;">',unsafe_allow_html=True)
         if st.button(t("Start Personalised Training","ابدأ التدريب المخصص"),key="start_training", use_container_width=True):
             fr = other_role.strip() if sel==opts[-1] else sel
@@ -1329,117 +1451,173 @@ def get_assess_shuffled_order():
     return st.session_state["assess_scenario_order"]
 
 def build_assess_prompt(role, index, is_phishing, language):
-    # Builds the AI prompt for assessment email generation.
-    # Similar to build_prompt() but simpler: no indicators needed,
-    # just the email body and a brief explanation for the results page.
-    # Uses ASSESS_PHISHING_TYPES or ASSESS_LEGIT_TYPES based on
-    # the is_phishing flag, selecting by shuffled index for variety.
-    is_ar     = (language=="Arabic")
-    order     = get_assess_shuffled_order()
-    sc_idx    = order[index % 5]
-    role_info = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
-    role_desc, role_ctx, role_type = role_info
-
-    if is_ar:
-        lang_rule=("قاعدة اللغة المطلقة — يجب الالتزام الكامل:\n"
-                   "1. كل كلمة في body/subject/explanation يجب أن تكون بالعربية الفصحى فقط — لا استثناء أبداً\n"
-                   "2. الاستثناء الوحيد: عناوين البريد والروابط تبقى باللاتينية فقط\n"
-                   "3. ممنوع: أي حرف لاتيني داخل النصوص العربية\n"
-                   "4. أمثلة على الأخطاء: 'طلب m عاجل' أو 'used-ت' — الصح: 'طلب عاجل' أو 'استخدام'\n"
-                   "5. حقل 'to' يجب أن يكون البريد الإلكتروني فقط بدون أي نص")
-    else:
-        lang_rule="Write everything in English."
-
-    if is_phishing:
-        sc_key, has_att, att_ext, has_link = ASSESS_PHISHING_TYPES[sc_idx]
-        sc_desc = get_role_scenario_desc(sc_key, role_type, is_ar)
-        inst = f"PHISHING EMAIL: {sc_desc}"
-        link_note = ('CRITICAL: "suspicious_link" MUST contain a realistic fake URL. Do NOT leave empty.' if has_link
-                     else '"suspicious_link" must be empty string "".')
-        att_note  = (f'"attachment" must be a realistic filename ending in {att_ext}.' if has_att
-                     else '"attachment" must be empty string "".')
-    else:
-        _, ar_inst, en_inst = ASSESS_LEGIT_TYPES[sc_idx]
-        inst     = f"LEGITIMATE EMAIL: {ar_inst if is_ar else en_inst}"
-        link_note= '"suspicious_link" must be empty string "".'
-        att_note = '"attachment" must be empty string "".'
-        has_att  = False; att_ext = ""
-
-    if is_ar:
-        body_ex=f"نص الرسالة بالعربية الفصحى فقط مناسب لـ {role_desc}"
-        expl_ex="شرح واضح لماذا هذه الرسالة "+("تصيد إلكتروني" if is_phishing else "شرعية")
-        from_ex="اسم المرسل <email@domain.com>"; subj_ex="الموضوع بالعربية الفصحى"
-    else:
-        body_ex=f"plain text email body relevant to {role_desc}"
-        expl_ex=f"clear explanation of why this email is {'phishing' if is_phishing else 'legitimate'}"
-        from_ex="Sender Name <email@domain.com>"; subj_ex="subject line"
-
+    # =============================================================
+    # ASSESSMENT PROMPT BUILDER (FREE GENERATION)
+    # The AI freely chooses attack type based on role + difficulty.
+    # For legitimate emails: freely generates realistic workplace email.
+    # =============================================================
+    is_ar      = (language == "Arabic")
     difficulty = st.session_state.get("difficulty", "medium")
-    diff_note = {
-        "easy": (
-            "DIFFICULTY: BEGINNER — phishing signs must be VERY obvious:\n"
-            "- Clearly fake domain (e.g. hospital-login.totally-fake.xyz)\n"
-            "- 2-3 obvious spelling/grammar mistakes\n"
-            "- Aggressive urgency (ACT NOW, IMMEDIATE ACTION REQUIRED)\n"
-            "- Generic greeting only ('Dear Staff', never recipient name)\n"
-            "- Suspicious request clearly stated (share password, confirm credentials)"
-            if not is_ar else
-            "مستوى الصعوبة: مبتدئ — علامات التصيد يجب أن تكون واضحة جداً:\n"
-            "- نطاق مزيف واضح (مثل hospital-login.totally-fake.xyz)\n"
-            "- 2-3 أخطاء إملائية أو نحوية واضحة\n"
-            "- إلحاح مبالغ فيه (تصرف الآن فوراً!)\n"
-            "- تحية عامة فقط مثل 'عزيزي الموظف' — لا تستخدم اسم المستلم\n"
-            "- طلب مشبوه صريح مثل (شارك كلمة المرور)"
-        ),
-        "medium": (
-            "DIFFICULTY: INTERMEDIATE — moderate difficulty:\n"
-            "- Slightly suspicious domain (e.g. hospital-hr-portal.net)\n"
-            "- Mostly professional with 1 minor red flag\n"
-            "- Moderate urgency, semi-personal greeting"
-            if not is_ar else
-            "مستوى الصعوبة: متوسط — صعوبة معتدلة:\n"
-            "- نطاق مشبوه نسبياً (مثل hospital-hr-portal.net)\n"
-            "- مهني في معظمه مع علامة تحذير واحدة\n"
-            "- إلحاح معتدل، تحية شبه شخصية"
-        ),
-        "hard": (
-            "DIFFICULTY: ADVANCED — signs must be very SUBTLE:\n"
-            "- Nearly legitimate domain with tiny change (e.g. hosp1tal.org, hospital-org.net)\n"
-            "- Perfect professional language, zero errors\n"
-            "- Subtle urgency, personalized greeting with full name and title\n"
-            "- Only ONE subtle red flag — everything else looks completely real\n"
-            "- Goal: even experienced employees might miss it"
-            if not is_ar else
-            "مستوى الصعوبة: متقدم — العلامات يجب أن تكون خفية جداً:\n"
-            "- نطاق يشبه الحقيقي مع تغيير بسيط (مثل hosp1tal.org أو hospital-org.net)\n"
-            "- لغة مهنية سليمة تماماً، صفر أخطاء\n"
-            "- إلحاح خفيف، تحية شخصية بالاسم الكامل واللقب\n"
-            "- علامة تحذيرية واحدة فقط وخفية — كل شيء آخر يبدو حقيقياً\n"
-            "- الهدف: حتى الموظف ذو الخبرة قد يتردد"
-        ),
-    }.get(difficulty, "")
+    role_info  = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
+    role_desc, role_ctx, role_type = role_info
+    seed = st.session_state.get("cache_version", random.randint(1000,9999))
 
-    return f"""Assessment email for phishing awareness training.
-Target: {role_desc} | Context: {role_ctx}
-{inst}
-{diff_note}
+    # ── Role-specific attack pool ───────────────────────────────
+    role_attacks = {
+        "clinical": (
+            "credential theft via fake EMR login link, malicious PDF (lab results/clinical protocol), "
+            "malicious Excel (staff schedule/patient roster), malicious Word macro (clinical guidelines), "
+            "fake Ministry of Health alert, medical director impersonation, "
+            "fake pharmacy system update, fake insurance login, fake clinical training link"
+        ),
+        "admin": (
+            "payroll credential theft link, malicious PDF (HR policy/audit), "
+            "malicious Excel (employee data/budget), malicious Word macro (contract), "
+            "CEO impersonation requesting financial action, fake vendor invoice, "
+            "fake benefits enrollment, fake procurement portal, fake license renewal"
+        ),
+        "it": (
+            "VPN credential theft, fake server security update link, fake SSL expiry alert, "
+            "malicious PDF (IT security policy/software license), "
+            "malicious Excel (asset inventory/access log), CIO impersonation, "
+            "fake helpdesk ticket, fake firewall config request, fake cloud storage link"
+        )
+    }
+    attacks = role_attacks.get(role_type, role_attacks["clinical"])
+
+    # ── Legitimate email pool ───────────────────────────────────
+    legit_pool = {
+        "clinical": (
+            "routine meeting invite from official hospital domain, "
+            "scheduled system maintenance notice from IT, "
+            "legitimate HR training notification, "
+            "department manager routine work update, "
+            "official payslip/schedule notification from HR system, "
+            "legitimate clinical protocol update from medical director"
+        ),
+        "admin": (
+            "routine team meeting invite from official domain, "
+            "IT maintenance notice with no suspicious links, "
+            "legitimate HR policy update notification, "
+            "manager routine work update from official email, "
+            "official payroll notification from HR system, "
+            "legitimate vendor contract renewal from known supplier"
+        ),
+        "it": (
+            "routine IT team meeting from official domain, "
+            "legitimate scheduled maintenance announcement, "
+            "official HR training notification, "
+            "manager routine work update, "
+            "legitimate software license renewal from verified vendor, "
+            "official security audit notification from management"
+        )
+    }
+    legit = legit_pool.get(role_type, legit_pool["clinical"])
+
+    # ── Difficulty rules ────────────────────────────────────────
+    if difficulty == "easy":
+        diff_rule = (
+            "DIFFICULTY: BEGINNER — signs very OBVIOUS.\n"
+            "Phishing: clearly fake domain, 2-3 spelling mistakes, aggressive urgency, generic greeting, obvious suspicious request.\n"
+            "Legitimate: very clearly official domain, perfectly professional, zero urgency, personalized greeting."
+        ) if not is_ar else (
+            "مستوى الصعوبة: مبتدئ — العلامات واضحة جداً.\n"
+            "التصيد: نطاق مزيف واضح، 2-3 أخطاء إملائية، إلحاح مبالغ فيه، تحية عامة، طلب مشبوه صريح.\n"
+            "الشرعية: نطاق رسمي واضح، أسلوب مهني، لا إلحاح، تحية شخصية."
+        )
+    elif difficulty == "hard":
+        diff_rule = (
+            "DIFFICULTY: ADVANCED — signs very SUBTLE.\n"
+            "Phishing: nearly legitimate domain (tiny change), perfect language, subtle urgency, personalized greeting, only ONE red flag.\n"
+            "Legitimate: completely real official email, no red flags whatsoever — challenging to distinguish from phishing."
+        ) if not is_ar else (
+            "مستوى الصعوبة: متقدم — العلامات خفية جداً.\n"
+            "التصيد: نطاق يشبه الحقيقي مع تغيير بسيط، لغة مهنية سليمة، إلحاح خفيف، تحية شخصية، علامة تحذيرية واحدة فقط.\n"
+            "الشرعية: بريد رسمي حقيقي تماماً، لا علامات تحذيرية — من الصعب التمييز."
+        )
+    else:
+        diff_rule = (
+            "DIFFICULTY: INTERMEDIATE — moderate.\n"
+            "Phishing: slightly suspicious domain, mostly professional with 1 red flag, moderate urgency.\n"
+            "Legitimate: clearly official but realistic workplace email."
+        ) if not is_ar else (
+            "مستوى الصعوبة: متوسط — معتدل.\n"
+            "التصيد: نطاق مشبوه نسبياً، مهني مع علامة تحذيرية واحدة، إلحاح معتدل.\n"
+            "الشرعية: رسمي وواضح لكن واقعي."
+        )
+
+    # ── Language rules ──────────────────────────────────────────
+    if is_ar:
+        lang_rule = (
+            "قاعدة اللغة: كل النصوص (subject/body/explanation) بالعربية الفصحى فقط.\n"
+            "استثناء: عناوين البريد والروابط تبقى بالحروف اللاتينية.\n"
+            "حقل 'to': البريد الإلكتروني فقط بدون أي نص عربي."
+        )
+        from_ex = "اسم المرسل <email@domain.com>"
+        subj_ex = "الموضوع بالعربية الفصحى"
+        body_ex = "نص الرسالة بالعربية الفصحى فقط"
+        expl_ex = "شرح واضح لماذا هذه الرسالة " + ("تصيد إلكتروني" if is_phishing else "شرعية")
+    else:
+        lang_rule = "Write everything in English only."
+        from_ex = "Sender Name <email@domain.com>"
+        subj_ex = "email subject line"
+        body_ex = f"plain text email body relevant to {role_desc}"
+        expl_ex = f"clear explanation of why this email is {'phishing' if is_phishing else 'legitimate'}"
+
+    # ── Task instruction ────────────────────────────────────────
+    if is_phishing:
+        task = (
+            f"Generate a PHISHING email targeting: {role_desc}\n"
+            f"Choose ONE attack type freely from this pool: {attacks}\n"
+            f"Make it realistic and role-appropriate.\n"
+            f"Session seed for variety: {seed}-assess-{index}"
+        )
+        link_rule = (
+            'If your attack uses a suspicious link: include it in "suspicious_link" AND verbatim in body.\n'
+            'If no link needed: "suspicious_link" must be empty string "".'
+        )
+        att_rule = (
+            'If your attack uses a file attachment: put realistic filename in "attachment".\n'
+            'If no attachment: "attachment" must be empty string "".'
+        )
+    else:
+        task = (
+            f"Generate a LEGITIMATE (non-phishing) workplace email for: {role_desc}\n"
+            f"Choose ONE realistic scenario from: {legit}\n"
+            f"Use official hospital domain (e.g. @hospital.org or @moh.gov.sa). No suspicious elements.\n"
+            f"Session seed for variety: {seed}-legit-{index}"
+        )
+        link_rule = '"suspicious_link" must be empty string "".'
+        att_rule  = '"attachment" must be empty string "".'
+
+    return f"""You are generating assessment emails for a phishing awareness training platform.
+
+TARGET ROLE: {role_desc}
+WORK CONTEXT: {role_ctx}
+
+TASK: {task}
+
+{diff_rule}
+
 {lang_rule}
-{link_note}
-{att_note}
-CRITICAL: "to" field = ONLY: employee@hospital.org (no Arabic text, no other words)
-body = PLAIN TEXT ONLY
+{link_rule}
+{att_rule}
 
-Return ONLY valid JSON:
+CRITICAL: body = PLAIN TEXT ONLY, use \\n for line breaks, no HTML.
+"to" field = ONLY the email address, nothing else.
+
+Return ONLY valid JSON, no markdown fences:
 {{
   "is_phishing": {"true" if is_phishing else "false"},
   "from": "{from_ex}",
   "to": "employee@hospital.org",
   "subject": "{subj_ex}",
-  "attachment": "{'filename'+att_ext if has_att else ''}",
+  "attachment": "",
   "body": "{body_ex}",
   "suspicious_link": "",
   "explanation": "{expl_ex}"
-}}"""
+}}"
+"""
 
 def generate_assess_email(role, index, is_phishing, language):
     # Generates one assessment email (phishing or legitimate).
