@@ -652,13 +652,19 @@ def call_ai(prompt, max_tokens=1600):
     # =============================================================
     provider = st.session_state.get("ai_provider", "groq")
 
+    def get_secret(key):
+        try:
+            return st.secrets[key]
+        except Exception:
+            return os.environ.get(key, "")
+
     # ── Groq (LLaMA 3.3-70b) ──────────────────────────────────
     if provider == "groq":
         resp = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
                 "Content-Type":  "application/json",
-                "Authorization": f"Bearer {os.environ.get('GROQ_API_KEY','')}"
+                "Authorization": f"Bearer {get_secret('GROQ_API_KEY')}"
             },
             json={
                 "model":       "llama-3.3-70b-versatile",
@@ -678,7 +684,7 @@ def call_ai(prompt, max_tokens=1600):
             "https://api.openai.com/v1/chat/completions",
             headers={
                 "Content-Type":  "application/json",
-                "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY','')}"
+                "Authorization": f"Bearer {get_secret('OPENAI_API_KEY')}"
             },
             json={
                 "model":       "gpt-4o",
@@ -696,7 +702,7 @@ def call_ai(prompt, max_tokens=1600):
             "https://api.anthropic.com/v1/messages",
             headers={
                 "Content-Type":      "application/json",
-                "x-api-key":         os.environ.get("ANTHROPIC_API_KEY", ""),
+                "x-api-key":         get_secret("ANTHROPIC_API_KEY"),
                 "anthropic-version": "2023-06-01"
             },
             json={
@@ -715,7 +721,7 @@ def call_ai(prompt, max_tokens=1600):
 
     # ── Google Gemini (gemini-1.5-pro) ─────────────────────────
     elif provider == "gemini":
-        api_key = os.environ.get("GEMINI_API_KEY", "")
+        api_key = get_secret("GEMINI_API_KEY")
         resp = requests.post(
             f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key}",
             headers={"Content-Type": "application/json"},
