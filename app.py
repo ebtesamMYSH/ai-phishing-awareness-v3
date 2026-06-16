@@ -453,188 +453,88 @@ def get_shuffled_scenario_order():
 # Returns a string prompt ready to send to the LLM.
 # =============================================================
 def build_prompt(role, index, language):
-    # =============================================================
-    # AI PROMPT BUILDER - LEARNING PHASE (FREE GENERATION)
-    # -------------------------------------------------------------
-    # Changed from v2: No fixed scenario types.
-    # The AI now freely chooses the attack type based on:
-    #   1. Role    (clinical / admin / IT)
-    #   2. Difficulty (easy / medium / hard)
-    #   3. Language   (Arabic / English)
-    # This guarantees different scenarios every session.
-    # =============================================================
-    is_ar     = (language == "Arabic")
+    is_ar      = (language == "Arabic")
     difficulty = st.session_state.get("difficulty", "medium")
     role_info  = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
     role_desc, role_ctx, role_type = role_info
+    seed = st.session_state.get("cache_version", 13)
 
-    # ── Role-specific attack pool (guides AI choices) ──────────
-    role_attacks = {
-        "clinical": (
-            "credential theft via fake EMR/hospital system login link, "
-            "malicious PDF (patient data, lab results, clinical protocol), "
-            "malicious Excel (staff schedule, patient roster), "
-            "malicious Word doc with macro (clinical guidelines), "
-            "fake Ministry of Health compliance alert, "
-            "medical director impersonation requesting patient data, "
-            "fake pharmacy system update, fake medical device alert, "
-            "fake insurance system login, fake clinical training enrollment"
-        ),
-        "admin": (
-            "payroll system credential theft link, "
-            "malicious PDF (HR policy, payroll report, audit request), "
-            "malicious Excel (employee data form, budget approval), "
-            "malicious Word doc with macro (contract, HR update), "
-            "CEO/director impersonation requesting financial transaction, "
-            "fake vendor invoice, fake employee benefits enrollment, "
-            "fake procurement portal, fake license renewal, "
-            "fake board meeting invite, fake ministry compliance notice"
-        ),
-        "it": (
-            "VPN credential theft link, "
-            "fake server security update link, "
-            "fake SSL certificate expiry alert, "
-            "malicious PDF (IT security policy, software license), "
-            "malicious Excel (asset inventory, system access log), "
-            "CIO/IT director impersonation requesting server credentials, "
-            "fake IT helpdesk ticket, fake firewall config request, "
-            "fake cloud storage link, fake backup system alert, "
-            "fake network monitoring alert"
-        )
+    # ── Pick attack type by index to guarantee variety ──────────
+    clinical_attacks = [
+        ("fake EMR login link",           "link",  "http://hosp1tal-emr.fake-login.net/update"),
+        ("malicious patient data PDF",    "pdf",   ""),
+        ("fake Ministry of Health alert", "link",  "http://moh-compliance.fake-check.com/verify"),
+        ("malicious clinical Excel file", "xlsx",  ""),
+        ("medical director impersonation","social",""),
+        ("fake pharmacy system update",   "link",  "http://pharma-system.hosp1tal-updates.xyz/login"),
+    ]
+    admin_attacks = [
+        ("fake payroll system login link","link",  "http://hr-payroll.hosp1tal-portal.net/login"),
+        ("malicious HR policy PDF",       "pdf",   ""),
+        ("CEO impersonation urgent wire", "social",""),
+        ("malicious budget Excel file",   "xlsx",  ""),
+        ("fake vendor invoice",           "link",  "http://vendor-invoice.hospital-billing.fake/pay"),
+        ("fake license renewal link",     "link",  "http://license-renew.ministry-health.fake/update"),
+    ]
+    it_attacks = [
+        ("fake VPN credentials link",     "link",  "http://vpn.hosp1tal-secure.net/login"),
+        ("malicious IT security PDF",     "pdf",   ""),
+        ("CIO impersonation server access","social",""),
+        ("malicious system access Excel", "xlsx",  ""),
+        ("fake SSL certificate alert",    "link",  "http://ssl-renew.hospital-it.fake/cert"),
+        ("fake firewall config request",  "link",  "http://firewall.hosp1tal-config.net/update"),
+    ]
+    pools = {"clinical": clinical_attacks, "admin": admin_attacks, "it": it_attacks}
+    attack_pool = pools.get(role_type, clinical_attacks)
+    attack_name, attack_fmt, fallback_link = attack_pool[index % len(attack_pool)]
+
+    # ── Difficulty ───────────────────────────────────────────────
+    diff_map = {
+        "easy": ("BEGINNER: obvious fake domain, 2 spelling mistakes, ALL-CAPS urgency, generic greeting 'Dear Staff'",
+                 "مبتدئ: نطاق مزيف واضح، خطأين إملائيين، إلحاح مبالغ فيه، تحية عامة 'عزيزي الموظف'"),
+        "medium": ("INTERMEDIATE: slightly suspicious domain, mostly professional, 1 red flag, semi-personal greeting",
+                   "متوسط: نطاق مشبوه نسبياً، مهني مع علامة تحذيرية واحدة، تحية شبه شخصية"),
+        "hard": ("ADVANCED: nearly real domain (tiny typo only), perfect language, subtle urgency, use recipient full name and title",
+                 "متقدم: نطاق يشبه الحقيقي مع خطأ بسيط فقط، لغة مهنية سليمة، إلحاح خفيف، الاسم الكامل واللقب"),
     }
-    attacks = role_attacks.get(role_type, role_attacks["clinical"])
+    diff_en, diff_ar = diff_map.get(difficulty, diff_map["medium"])
+    diff_rule = diff_ar if is_ar else diff_en
 
-    # ── Difficulty rules ────────────────────────────────────────
-    if difficulty == "easy":
-        diff_rule = (
-            "DIFFICULTY: BEGINNER — signs must be VERY obvious and easy to spot.\n"
-            "- Domain: clearly fake (e.g. hosp1tal-updates.xyz, hospital-login.totally-fake.net)\n"
-            "- Include 2-3 obvious spelling/grammar mistakes in the body\n"
-            "- Urgency: aggressive ALL-CAPS (URGENT ACTION REQUIRED, ACT NOW)\n"
-            "- Greeting: generic only — 'Dear Staff' or 'Dear User', never use recipient name\n"
-            "- Request: obviously suspicious (share your password, confirm full credentials)\n"
-            "Goal: even a non-technical person easily identifies this as phishing."
-        ) if not is_ar else (
-            "مستوى الصعوبة: مبتدئ — العلامات يجب أن تكون واضحة جداً وسهلة الاكتشاف.\n"
-            "- النطاق: مزيف بشكل واضح (مثل hosp1tal-updates.xyz أو hospital-login.totally-fake.net)\n"
-            "- أضف 2-3 أخطاء إملائية أو نحوية واضحة في نص الرسالة\n"
-            "- الإلحاح: مبالغ فيه (تصرف الآن فوراً! موعد نهائي اليوم!)\n"
-            "- التحية: عامة فقط مثل 'عزيزي الموظف' — لا تستخدم اسم المستلم أبداً\n"
-            "- الطلب: مشبوه بشكل صريح (شارك كلمة المرور، أدخل بياناتك الكاملة)\n"
-            "الهدف: أي شخص حتى غير متخصص يتعرف على التصيد بسهولة."
-        )
-    elif difficulty == "hard":
-        diff_rule = (
-            "DIFFICULTY: ADVANCED — signs must be very SUBTLE and hard to detect.\n"
-            "- Domain: nearly legitimate with tiny change (e.g. hosp1tal.org, hospital-org.net, hospital.org.co)\n"
-            "- Perfect professional language, zero grammar/spelling errors\n"
-            "- Urgency: subtle and polite ('We kindly request your attention by end of business today')\n"
-            "- Greeting: use recipient's full name and title\n"
-            "- Content: nearly identical to a real internal hospital email — plausible reason, correct terminology\n"
-            "- Only ONE subtle red flag — everything else looks completely legitimate\n"
-            "Goal: even an experienced employee might hesitate."
-        ) if not is_ar else (
-            "مستوى الصعوبة: متقدم — العلامات يجب أن تكون خفية جداً وصعبة الاكتشاف.\n"
-            "- النطاق: يشبه الحقيقي مع تغيير بسيط جداً (مثل hosp1tal.org أو hospital-org.net)\n"
-            "- لغة مهنية سليمة تماماً، صفر أخطاء إملائية أو نحوية\n"
-            "- الإلحاح: خفيف ومهني ('نرجو الاطلاع والرد قبل نهاية يوم العمل')\n"
-            "- التحية: الاسم الكامل والمسمى الوظيفي للمستلم\n"
-            "- المحتوى: مطابق للمراسلات الداخلية الحقيقية — سبب منطقي وتفاصيل واقعية\n"
-            "- علامة تحذيرية واحدة فقط وخفية — كل شيء آخر يبدو حقيقياً\n"
-            "الهدف: حتى موظف ذو خبرة قد يتردد."
-        )
-    else:
-        diff_rule = (
-            "DIFFICULTY: INTERMEDIATE — moderate difficulty, realistic phishing.\n"
-            "- Domain: slightly suspicious but not obviously fake (e.g. hospital-hr-portal.net)\n"
-            "- Mostly professional with 1 minor red flag in wording\n"
-            "- Urgency: moderate ('Please complete this by end of week')\n"
-            "- Greeting: semi-personal (uses title but maybe wrong name)\n"
-            "Goal: a careful person notices something is off, but a busy person might miss it."
-        ) if not is_ar else (
-            "مستوى الصعوبة: متوسط — صعوبة معتدلة، تصيد واقعي.\n"
-            "- النطاق: مشبوه نسبياً لكن ليس واضح الزيف (مثل hospital-hr-portal.net)\n"
-            "- مهني في معظمه مع علامة تحذيرية واحدة في الصياغة\n"
-            "- الإلحاح: معتدل ('يرجى إكمال ذلك بنهاية الأسبوع')\n"
-            "- التحية: شبه شخصية (تستخدم اللقب لكن ربما باسم خاطئ)\n"
-            "الهدف: الشخص المنتبه يلاحظ شيئاً غريباً، لكن الشخص المشغول قد يفوته."
-        )
-
-    # ── Language rules ──────────────────────────────────────────
+    # ── Language ─────────────────────────────────────────────────
     if is_ar:
-        lang_rule = (
-            "قاعدة اللغة المطلقة — يجب الالتزام الكامل:\n"
-            "1. كل كلمة في subject, body, suspicious_text, indicators, why_risky, learning_tip "
-            "يجب أن تكون بالعربية الفصحى فقط — لا استثناء أبداً\n"
-            "2. الاستثناء الوحيد: عناوين البريد الإلكتروني والروابط (http://...) تبقى باللاتينية\n"
-            "3. ممنوع: أي حرف لاتيني داخل النصوص العربية\n"
-            "4. أمثلة على الأخطاء المحظورة: 'طلب m عاجل' أو 'HRالـ' — الصح: 'طلب عاجل' أو 'الموارد البشرية'\n"
-            "5. حقل 'to' يجب أن يكون البريد الإلكتروني فقط بدون أي نص عربي\n"
-            "6. الكلمات التقنية: 'Excel'='إكسل'، 'PDF'='ملف PDF'، 'VPN'='الشبكة الافتراضية'"
-        )
-        from_ex  = "اسم المرسل <fake@suspicious-domain.com>"
-        body_ex  = "نص الرسالة بالعربية الفصحى فقط"
-        ind_t_ex = "عنوان المؤشر بالعربية الفصحى"
-        ind_d_ex = "وصف تقني تفصيلي بالعربية الفصحى"
+        lang_rule = "كل النصوص بالعربية الفصحى فقط. الاستثناء: الروابط والبريد الإلكتروني تبقى لاتينية."
+        from_ex = "اسم المرسل <fake@suspicious-domain.com>"
+        body_ex = "نص الرسالة بالعربية فقط"
+        ind_ex  = ("عنوان المؤشر", "وصف تقني")
     else:
-        lang_rule = "Write everything in English only. Do not mix any Arabic or foreign characters."
-        from_ex  = "Sender Name <fake@suspicious-domain.com>"
-        body_ex  = "plain text email body in English"
-        ind_t_ex = "indicator title in English"
-        ind_d_ex = "detailed technical explanation in English"
+        lang_rule = "Write everything in English only."
+        from_ex = "Sender Name <fake@domain.com>"
+        body_ex = "email body in English"
+        ind_ex  = ("indicator title", "technical explanation")
 
-    # ── Session seed for variety ────────────────────────────────
-    seed = st.session_state.get("cache_version", random.randint(1000,9999))
+    # ── Format hint ──────────────────────────────────────────────
+    if attack_fmt == "link":
+        fmt_hint = f'Use a suspicious link. Put it in "suspicious_link" AND in the body. Suggested fake URL: {fallback_link}'
+        att_hint = '"attachment": ""'
+    elif attack_fmt in ("pdf","xlsx","docx"):
+        fmt_hint = f'Use a malicious {attack_fmt.upper()} attachment. Put filename in "attachment". No link needed.'
+        att_hint = f'"attachment": "relevant_filename.{attack_fmt}"'
+    else:
+        fmt_hint = 'Pure social engineering. No link, no attachment.'
+        att_hint = '"attachment": "", "suspicious_link": ""'
 
-    return f"""You are a cybersecurity educator creating phishing awareness training for Saudi healthcare employees.
+    return f"""Phishing awareness training email for Saudi healthcare. Seed:{seed}-{index}
 
-═══════════════════════════════════════════════
-STRICT RULES — MUST FOLLOW ALL OF THESE:
-═══════════════════════════════════════════════
+ROLE: {role_desc} | CONTEXT: {role_ctx}
+ATTACK: {attack_name}
+DIFFICULTY: {diff_rule}
+LANGUAGE: {lang_rule}
+FORMAT: {fmt_hint}
+{att_hint}
+CRITICAL: body=plain text only, "to"=email address only, content MUST match {role_type} role.
 
-RULE 1 — TARGET ROLE (MANDATORY):
-The email MUST target ONLY: {role_desc}
-Work context MUST be about: {role_ctx}
-FORBIDDEN: Do NOT generate IT support emails for clinical staff, HR emails for IT staff, etc.
-The sender, subject, body, and scenario MUST all match the role above exactly.
-
-RULE 2 — ATTACK TYPE (pick ONE from this list, use variety across 6 examples):
-{attacks}
-Session variety seed: {seed}-example{index}
-
-RULE 3 — DIFFICULTY:
-{diff_rule}
-
-RULE 4 — LANGUAGE (STRICT):
-{lang_rule}
-
-RULE 5 — FORMAT:
-- body: PLAIN TEXT ONLY, use \\n for line breaks, NO HTML tags
-- "to" field: email address ONLY, no other text
-- If attack uses a link: put fake URL in "suspicious_link" AND verbatim in body
-- If attack uses attachment: put filename in "attachment" field
-- If social engineering only: "suspicious_link" = "" and "attachment" = ""
-
-═══════════════════════════════════════════════
-Return ONLY valid JSON (no markdown, no extra text):
-═══════════════════════════════════════════════
-{{
-  "email_type": "{'نوع هجوم التصيد' if is_ar else 'attack type name'}",
-  "from": "{from_ex}",
-  "to": "employee@hospital.org",
-  "subject": "{'الموضوع بالعربية الفصحى فقط' if is_ar else 'subject line in English'}",
-  "attachment": "{'اسم_الملف.ext أو فارغ' if is_ar else 'filename.ext or empty'}",
-  "body": "{body_ex}",
-  "suspicious_text": "{'العبارة الأكثر إثارة للشك' if is_ar else 'most suspicious phrase from body'}",
-  "suspicious_link": "http://fake-url.com/path or empty string",
-  "indicators": [
-    {{"number": 1, "title": "{ind_t_ex}", "description": "{ind_d_ex}"}},
-    {{"number": 2, "title": "{ind_t_ex}", "description": "{ind_d_ex}"}},
-    {{"number": 3, "title": "{ind_t_ex}", "description": "{ind_d_ex}"}}
-  ],
-  "why_risky": "{'فقرة تفصيلية تشرح لماذا هذه الرسالة خطيرة على موظف في هذا الدور' if is_ar else 'detailed paragraph explaining why this is dangerous for this specific role'}",
-  "learning_tip": "{'نصيحة عملية مخصصة لهذا الدور الوظيفي' if is_ar else 'practical tip specific to this role'}"
-}}"""
+Return ONLY valid JSON:
+{{"email_type":"{attack_name}","from":"{from_ex}","to":"employee@hospital.org","subject":"...","attachment":"...","body":"{body_ex}","suspicious_text":"...","suspicious_link":"...","indicators":[{{"number":1,"title":"{ind_ex[0]}","description":"{ind_ex[1]}"}},{{"number":2,"title":"{ind_ex[0]}","description":"{ind_ex[1]}"}},{{"number":3,"title":"{ind_ex[0]}","description":"{ind_ex[1]}"}}],"why_risky":"...","learning_tip":"..."}}"""
 
 # =============================================================
 # API COMMUNICATION LAYER
@@ -1451,184 +1351,59 @@ def get_assess_shuffled_order():
     return st.session_state["assess_scenario_order"]
 
 def build_assess_prompt(role, index, is_phishing, language):
-    # =============================================================
-    # ASSESSMENT PROMPT BUILDER (FREE GENERATION)
-    # The AI freely chooses attack type based on role + difficulty.
-    # For legitimate emails: freely generates realistic workplace email.
-    # =============================================================
     is_ar      = (language == "Arabic")
     difficulty = st.session_state.get("difficulty", "medium")
     role_info  = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
     role_desc, role_ctx, role_type = role_info
-    seed = st.session_state.get("cache_version", random.randint(1000,9999))
+    seed = st.session_state.get("cache_version", 13)
 
-    # ── Role-specific attack pool ───────────────────────────────
-    role_attacks = {
-        "clinical": (
-            "credential theft via fake EMR login link, malicious PDF (lab results/clinical protocol), "
-            "malicious Excel (staff schedule/patient roster), malicious Word macro (clinical guidelines), "
-            "fake Ministry of Health alert, medical director impersonation, "
-            "fake pharmacy system update, fake insurance login, fake clinical training link"
-        ),
-        "admin": (
-            "payroll credential theft link, malicious PDF (HR policy/audit), "
-            "malicious Excel (employee data/budget), malicious Word macro (contract), "
-            "CEO impersonation requesting financial action, fake vendor invoice, "
-            "fake benefits enrollment, fake procurement portal, fake license renewal"
-        ),
-        "it": (
-            "VPN credential theft, fake server security update link, fake SSL expiry alert, "
-            "malicious PDF (IT security policy/software license), "
-            "malicious Excel (asset inventory/access log), CIO impersonation, "
-            "fake helpdesk ticket, fake firewall config request, fake cloud storage link"
-        )
+    # ── Pick attack by index for variety ────────────────────────
+    clinical_p = ["fake EMR login link","malicious lab results PDF","fake MOH compliance alert","malicious patient roster Excel","medical director impersonation"]
+    admin_p    = ["fake payroll login link","malicious HR policy PDF","CEO impersonation financial wire","malicious budget Excel","fake vendor invoice link"]
+    it_p       = ["fake VPN login link","malicious IT security PDF","CIO impersonation server access","malicious asset inventory Excel","fake SSL certificate alert"]
+    clinical_l = ["routine team meeting invite","scheduled IT maintenance notice","HR training notification","manager work update","official payslip notification"]
+    admin_l    = ["routine team meeting invite","IT maintenance notice","HR policy update","manager work update","vendor contract renewal"]
+    it_l       = ["routine IT team meeting","scheduled maintenance announcement","HR training notification","manager work update","software license renewal from verified vendor"]
+
+    pools_p = {"clinical":clinical_p,"admin":admin_p,"it":it_p}
+    pools_l = {"clinical":clinical_l,"admin":admin_l,"it":it_l}
+    attack = pools_p.get(role_type, clinical_p)[index % 5] if is_phishing else pools_l.get(role_type, clinical_l)[index % 5]
+
+    diff_map = {
+        "easy":   ("BEGINNER: obvious fake domain, spelling mistakes, ALL-CAPS urgency, generic greeting",
+                   "مبتدئ: نطاق مزيف واضح، أخطاء إملائية، إلحاح مبالغ، تحية عامة"),
+        "medium": ("INTERMEDIATE: slightly suspicious domain, 1 red flag, moderate urgency",
+                   "متوسط: نطاق مشبوه نسبياً، علامة تحذيرية واحدة، إلحاح معتدل"),
+        "hard":   ("ADVANCED: nearly real domain tiny typo only, perfect language, subtle urgency, recipient full name",
+                   "متقدم: نطاق يشبه الحقيقي مع خطأ بسيط فقط، لغة سليمة، إلحاح خفيف، الاسم الكامل"),
     }
-    attacks = role_attacks.get(role_type, role_attacks["clinical"])
+    diff_en, diff_ar = diff_map.get(difficulty, diff_map["medium"])
+    diff_rule = diff_ar if is_ar else diff_en
 
-    # ── Legitimate email pool ───────────────────────────────────
-    legit_pool = {
-        "clinical": (
-            "routine meeting invite from official hospital domain, "
-            "scheduled system maintenance notice from IT, "
-            "legitimate HR training notification, "
-            "department manager routine work update, "
-            "official payslip/schedule notification from HR system, "
-            "legitimate clinical protocol update from medical director"
-        ),
-        "admin": (
-            "routine team meeting invite from official domain, "
-            "IT maintenance notice with no suspicious links, "
-            "legitimate HR policy update notification, "
-            "manager routine work update from official email, "
-            "official payroll notification from HR system, "
-            "legitimate vendor contract renewal from known supplier"
-        ),
-        "it": (
-            "routine IT team meeting from official domain, "
-            "legitimate scheduled maintenance announcement, "
-            "official HR training notification, "
-            "manager routine work update, "
-            "legitimate software license renewal from verified vendor, "
-            "official security audit notification from management"
-        )
-    }
-    legit = legit_pool.get(role_type, legit_pool["clinical"])
-
-    # ── Difficulty rules ────────────────────────────────────────
-    if difficulty == "easy":
-        diff_rule = (
-            "DIFFICULTY: BEGINNER — signs very OBVIOUS.\n"
-            "Phishing: clearly fake domain, 2-3 spelling mistakes, aggressive urgency, generic greeting, obvious suspicious request.\n"
-            "Legitimate: very clearly official domain, perfectly professional, zero urgency, personalized greeting."
-        ) if not is_ar else (
-            "مستوى الصعوبة: مبتدئ — العلامات واضحة جداً.\n"
-            "التصيد: نطاق مزيف واضح، 2-3 أخطاء إملائية، إلحاح مبالغ فيه، تحية عامة، طلب مشبوه صريح.\n"
-            "الشرعية: نطاق رسمي واضح، أسلوب مهني، لا إلحاح، تحية شخصية."
-        )
-    elif difficulty == "hard":
-        diff_rule = (
-            "DIFFICULTY: ADVANCED — signs very SUBTLE.\n"
-            "Phishing: nearly legitimate domain (tiny change), perfect language, subtle urgency, personalized greeting, only ONE red flag.\n"
-            "Legitimate: completely real official email, no red flags whatsoever — challenging to distinguish from phishing."
-        ) if not is_ar else (
-            "مستوى الصعوبة: متقدم — العلامات خفية جداً.\n"
-            "التصيد: نطاق يشبه الحقيقي مع تغيير بسيط، لغة مهنية سليمة، إلحاح خفيف، تحية شخصية، علامة تحذيرية واحدة فقط.\n"
-            "الشرعية: بريد رسمي حقيقي تماماً، لا علامات تحذيرية — من الصعب التمييز."
-        )
-    else:
-        diff_rule = (
-            "DIFFICULTY: INTERMEDIATE — moderate.\n"
-            "Phishing: slightly suspicious domain, mostly professional with 1 red flag, moderate urgency.\n"
-            "Legitimate: clearly official but realistic workplace email."
-        ) if not is_ar else (
-            "مستوى الصعوبة: متوسط — معتدل.\n"
-            "التصيد: نطاق مشبوه نسبياً، مهني مع علامة تحذيرية واحدة، إلحاح معتدل.\n"
-            "الشرعية: رسمي وواضح لكن واقعي."
-        )
-
-    # ── Language rules ──────────────────────────────────────────
     if is_ar:
-        lang_rule = (
-            "قاعدة اللغة: كل النصوص (subject/body/explanation) بالعربية الفصحى فقط.\n"
-            "استثناء: عناوين البريد والروابط تبقى بالحروف اللاتينية.\n"
-            "حقل 'to': البريد الإلكتروني فقط بدون أي نص عربي."
-        )
-        from_ex = "اسم المرسل <email@domain.com>"
-        subj_ex = "الموضوع بالعربية الفصحى"
-        body_ex = "نص الرسالة بالعربية الفصحى فقط"
-        expl_ex = "شرح واضح لماذا هذه الرسالة " + ("تصيد إلكتروني" if is_phishing else "شرعية")
+        lang = "كل النصوص بالعربية فقط. الروابط والبريد الإلكتروني لاتينية."
+        task = f"{'أنشئ بريد تصيد' if is_phishing else 'أنشئ بريد شرعي'} يستهدف: {role_desc}\nالسيناريو: {attack}"
+        expl = f"اشرح لماذا هذا البريد {'تصيد' if is_phishing else 'شرعي'}"
+        from_ex, subj_ex, body_ex = "المرسل <email@domain.com>", "الموضوع", "نص الرسالة"
     else:
-        lang_rule = "Write everything in English only."
-        from_ex = "Sender Name <email@domain.com>"
-        subj_ex = "email subject line"
-        body_ex = f"plain text email body relevant to {role_desc}"
-        expl_ex = f"clear explanation of why this email is {'phishing' if is_phishing else 'legitimate'}"
+        lang = "Write everything in English only."
+        task = f"Generate a {'PHISHING' if is_phishing else 'LEGITIMATE'} email targeting: {role_desc}\nScenario: {attack}"
+        expl = f"Explain why this email is {'phishing' if is_phishing else 'legitimate'}"
+        from_ex, subj_ex, body_ex = "Sender <email@domain.com>", "subject line", "email body"
 
-    # ── Task instruction ────────────────────────────────────────
-    if is_phishing:
-        task = (
-            f"Generate a PHISHING email targeting: {role_desc}\n"
-            f"Choose ONE attack type freely from this pool: {attacks}\n"
-            f"Make it realistic and role-appropriate.\n"
-            f"Session seed for variety: {seed}-assess-{index}"
-        )
-        link_rule = (
-            'If your attack uses a suspicious link: include it in "suspicious_link" AND verbatim in body.\n'
-            'If no link needed: "suspicious_link" must be empty string "".'
-        )
-        att_rule = (
-            'If your attack uses a file attachment: put realistic filename in "attachment".\n'
-            'If no attachment: "attachment" must be empty string "".'
-        )
-    else:
-        task = (
-            f"Generate a LEGITIMATE (non-phishing) workplace email for: {role_desc}\n"
-            f"Choose ONE realistic scenario from: {legit}\n"
-            f"Use official hospital domain (e.g. @hospital.org or @moh.gov.sa). No suspicious elements.\n"
-            f"Session seed for variety: {seed}-legit-{index}"
-        )
-        link_rule = '"suspicious_link" must be empty string "".'
-        att_rule  = '"attachment" must be empty string "".'
+    link_hint = 'If phishing with link: put URL in "suspicious_link" AND in body. Otherwise "suspicious_link":""' if is_phishing else '"suspicious_link":""'
 
-    return f"""You are generating assessment emails for a phishing awareness training platform.
+    return f"""Assessment email for phishing training. Seed:{seed}-assess-{index}
+ROLE: {role_desc} | CONTEXT: {role_ctx}
+TASK: {task}
+DIFFICULTY: {diff_rule}
+LANGUAGE: {lang}
+{link_hint}
+body=plain text only. "to"=email only. Content MUST match {role_type} role.
+{"Legitimate: use official domain @hospital.org or @moh.gov.sa, no suspicious elements." if not is_phishing else ""}
 
-═══════════════════════════════════════════════
-STRICT RULES — MUST FOLLOW ALL:
-═══════════════════════════════════════════════
-
-RULE 1 — TARGET ROLE (MANDATORY):
-MUST target ONLY: {role_desc}
-Work context MUST be about: {role_ctx}
-FORBIDDEN: Do NOT use IT content for clinical staff, HR content for IT staff, etc.
-
-RULE 2 — TASK:
-{task}
-
-RULE 3 — DIFFICULTY:
-{diff_rule}
-
-RULE 4 — LANGUAGE (STRICT):
-{lang_rule}
-
-RULE 5 — FORMAT:
-- body: PLAIN TEXT ONLY, \\n for line breaks, NO HTML
-- "to" field: email address ONLY, nothing else
-{link_rule}
-{att_rule}
-
-═══════════════════════════════════════════════
-Return ONLY valid JSON (no markdown, no extra text):
-═══════════════════════════════════════════════
-{{
-  "is_phishing": {"true" if is_phishing else "false"},
-  "from": "{from_ex}",
-  "to": "employee@hospital.org",
-  "subject": "{subj_ex}",
-  "attachment": "",
-  "body": "{body_ex}",
-  "suspicious_link": "",
-  "explanation": "{expl_ex}"
-}}"""
+Return ONLY valid JSON:
+{{"is_phishing":{"true" if is_phishing else "false"},"from":"{from_ex}","to":"employee@hospital.org","subject":"{subj_ex}","attachment":"","body":"{body_ex}","suspicious_link":"","explanation":"{expl}"}}"""
 
 def generate_assess_email(role, index, is_phishing, language):
     for attempt in range(3):
