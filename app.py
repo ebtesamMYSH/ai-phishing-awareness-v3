@@ -793,11 +793,6 @@ def clean_result(result, is_arabic):
     return result
 
 def generate_email(role, index, language):
-    # Main function for generating Learning Phase emails.
-    # Flow: build_prompt -> call_groq -> parse_json -> clean_result
-    # Also overrides "to" with a realistic recipient address and
-    # ensures suspicious links are always present when required
-    # by the scenario (adds a fallback URL if the AI omitted it).
     try:
         data = call_groq(build_prompt(role, index, language))
         if "error" in data:
@@ -807,16 +802,10 @@ def generate_email(role, index, language):
         raw    = data["choices"][0]["message"]["content"].strip()
         result = parse_json_response(raw)
         result = clean_result(result, language=="Arabic")
-        # Always override "to" with realistic role-based recipient
         result["to"] = get_recipient(role, index, language)
 
-        # Post-process: if scenario needs link but it's empty, add a fallback
-        order    = get_shuffled_scenario_order()
-        sc_idx   = order[index % len(order)]
-        scenario = PHISHING_SCENARIOS[sc_idx]
-        if scenario.get("has_link") and not result.get("suspicious_link","").strip():
-            result["suspicious_link"] = f"http://hospital-verify.secure-update.net/login"
-            # append to body if not there
+        # If AI generated a link, make sure it appears in the body too
+        if result.get("suspicious_link","").strip():
             if result["suspicious_link"] not in result.get("body",""):
                 result["body"] = result.get("body","") + f'\n{result["suspicious_link"]}'
 
@@ -1642,29 +1631,24 @@ Return ONLY valid JSON (no markdown, no extra text):
 }}"""
 
 def generate_assess_email(role, index, is_phishing, language):
-    # Generates one assessment email (phishing or legitimate).
-    # Retries up to 3 times on JSON parse failure (LLM can be
-    # inconsistent). Overrides "to" with a realistic recipient.
-    # For phishing scenarios that need a link, adds fallback URL
-    # if the AI omitted it.
     for attempt in range(3):
         try:
-            data=call_groq(build_assess_prompt(role,index,is_phishing,language),max_tokens=800)
-            if "error" in data: return {"error":data["error"].get("message",str(data["error"]))}
-            result=parse_json_response(data["choices"][0]["message"]["content"].strip())
-            result=clean_result(result,language=="Arabic")
-            # Override "to" with realistic recipient
+            data = call_groq(build_assess_prompt(role, index, is_phishing, language), max_tokens=800)
+            if "error" in data:
+                return {"error": data["error"].get("message", str(data["error"]))}
+            result = parse_json_response(data["choices"][0]["message"]["content"].strip())
+            result = clean_result(result, language=="Arabic")
             result["to"] = get_recipient(st.session_state.get("role","Clinical"), index, language)
-            # Ensure link shows if needed
-            order=get_assess_shuffled_order(); sc_idx=order[index%5]
-            if is_phishing:
-                _,_,_,has_link=ASSESS_PHISHING_TYPES[sc_idx]
-                if has_link and not result.get("suspicious_link","").strip():
-                    result["suspicious_link"]="http://hospital-verify.secure-check.net/login"
+            # If AI included a link, make sure it appears in body
+            if result.get("suspicious_link","").strip():
+                if result["suspicious_link"] not in result.get("body",""):
+                    result["body"] = result.get("body","") + f'\n{result["suspicious_link"]}'
             return result
         except json.JSONDecodeError:
-            if attempt==2: return {"error":"Failed to parse. Please try again."}
-        except Exception as e: return {"error":str(e)}
+            if attempt == 2:
+                return {"error": "Failed to parse. Please try again."}
+        except Exception as e:
+            return {"error": str(e)}
 
 # =============================================================
 # PAGE 4: ASSESSMENT PHASE
