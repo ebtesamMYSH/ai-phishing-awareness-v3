@@ -672,7 +672,7 @@ def call_ai(prompt, max_tokens=1600):
                 "Authorization": f"Bearer {get_secret('GROQ_API_KEY')}"
             },
             json={
-                "model":       "llama-3.3-70b-versatile",
+                "model":       "llama-3.1-8b-instant",
                 "max_tokens":  max_tokens,
                 "temperature": 0.85,
                 "messages":    [{"role": "user", "content": prompt}]
