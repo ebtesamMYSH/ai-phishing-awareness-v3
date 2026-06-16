@@ -586,50 +586,55 @@ def build_prompt(role, index, language):
     # ── Session seed for variety ────────────────────────────────
     seed = st.session_state.get("cache_version", random.randint(1000,9999))
 
-    return f"""You are a cybersecurity educator creating phishing awareness training content for Saudi healthcare employees.
+    return f"""You are a cybersecurity educator creating phishing awareness training for Saudi healthcare employees.
 
-YOUR TASK — LEARNING EXAMPLE #{index + 1} of 6:
-Generate a realistic phishing email targeting a healthcare employee.
+═══════════════════════════════════════════════
+STRICT RULES — MUST FOLLOW ALL OF THESE:
+═══════════════════════════════════════════════
 
-TARGET ROLE: {role_desc}
-WORK CONTEXT: {role_ctx}
+RULE 1 — TARGET ROLE (MANDATORY):
+The email MUST target ONLY: {role_desc}
+Work context MUST be about: {role_ctx}
+FORBIDDEN: Do NOT generate IT support emails for clinical staff, HR emails for IT staff, etc.
+The sender, subject, body, and scenario MUST all match the role above exactly.
 
-ATTACK TYPE — Choose freely and creatively from this pool (pick ONE that fits the role):
+RULE 2 — ATTACK TYPE (pick ONE from this list, use variety across 6 examples):
 {attacks}
+Session variety seed: {seed}-example{index}
 
-IMPORTANT: Each of the 6 learning examples must use a DIFFERENT attack type.
-Session seed (use for variety): {seed}-{index}
-
+RULE 3 — DIFFICULTY:
 {diff_rule}
 
+RULE 4 — LANGUAGE (STRICT):
 {lang_rule}
 
-ATTACK FORMAT RULES:
-- If your chosen attack involves a suspicious link: include a realistic fake URL in both "suspicious_link" field AND in the body text verbatim
-- If your chosen attack involves a file attachment: put a realistic filename in "attachment" field (e.g. patient_data.pdf, staff_schedule.xlsx, policy_update.docx)
-- If pure social engineering (no link, no file): leave both "suspicious_link" and "attachment" as empty strings ""
-- body: PLAIN TEXT ONLY, use \\n for line breaks, no HTML
-- "to" field: ONLY the email address, no Arabic text
+RULE 5 — FORMAT:
+- body: PLAIN TEXT ONLY, use \\n for line breaks, NO HTML tags
+- "to" field: email address ONLY, no other text
+- If attack uses a link: put fake URL in "suspicious_link" AND verbatim in body
+- If attack uses attachment: put filename in "attachment" field
+- If social engineering only: "suspicious_link" = "" and "attachment" = ""
 
-Return ONLY valid JSON, no markdown fences:
+═══════════════════════════════════════════════
+Return ONLY valid JSON (no markdown, no extra text):
+═══════════════════════════════════════════════
 {{
-  "email_type": "{'نوع هجوم التصيد بالعربية' if is_ar else 'phishing attack type name'}",
+  "email_type": "{'نوع هجوم التصيد' if is_ar else 'attack type name'}",
   "from": "{from_ex}",
   "to": "employee@hospital.org",
-  "subject": "{'الموضوع بالعربية الفصحى' if is_ar else 'email subject line'}",
-  "attachment": "{'اسم_الملف.pdf أو فارغ' if is_ar else 'filename.ext or empty string'}",
+  "subject": "{'الموضوع بالعربية الفصحى فقط' if is_ar else 'subject line in English'}",
+  "attachment": "{'اسم_الملف.ext أو فارغ' if is_ar else 'filename.ext or empty'}",
   "body": "{body_ex}",
-  "suspicious_text": "{'العبارة الأكثر إثارة للشك من النص' if is_ar else 'most suspicious phrase from the body'}",
+  "suspicious_text": "{'العبارة الأكثر إثارة للشك' if is_ar else 'most suspicious phrase from body'}",
   "suspicious_link": "http://fake-url.com/path or empty string",
   "indicators": [
     {{"number": 1, "title": "{ind_t_ex}", "description": "{ind_d_ex}"}},
     {{"number": 2, "title": "{ind_t_ex}", "description": "{ind_d_ex}"}},
     {{"number": 3, "title": "{ind_t_ex}", "description": "{ind_d_ex}"}}
   ],
-  "why_risky": "{'فقرة تفصيلية تشرح لماذا هذه الرسالة خطيرة' if is_ar else 'detailed paragraph explaining why this email is dangerous'}",
-  "learning_tip": "{'نصيحة عملية مفصلة للموظف' if is_ar else 'practical tip for the employee'}"
-}}"
-"""
+  "why_risky": "{'فقرة تفصيلية تشرح لماذا هذه الرسالة خطيرة على موظف في هذا الدور' if is_ar else 'detailed paragraph explaining why this is dangerous for this specific role'}",
+  "learning_tip": "{'نصيحة عملية مخصصة لهذا الدور الوظيفي' if is_ar else 'practical tip specific to this role'}"
+}}"""
 
 # =============================================================
 # API COMMUNICATION LAYER
@@ -1598,21 +1603,33 @@ def build_assess_prompt(role, index, is_phishing, language):
 
     return f"""You are generating assessment emails for a phishing awareness training platform.
 
-TARGET ROLE: {role_desc}
-WORK CONTEXT: {role_ctx}
+═══════════════════════════════════════════════
+STRICT RULES — MUST FOLLOW ALL:
+═══════════════════════════════════════════════
 
-TASK: {task}
+RULE 1 — TARGET ROLE (MANDATORY):
+MUST target ONLY: {role_desc}
+Work context MUST be about: {role_ctx}
+FORBIDDEN: Do NOT use IT content for clinical staff, HR content for IT staff, etc.
 
+RULE 2 — TASK:
+{task}
+
+RULE 3 — DIFFICULTY:
 {diff_rule}
 
+RULE 4 — LANGUAGE (STRICT):
 {lang_rule}
+
+RULE 5 — FORMAT:
+- body: PLAIN TEXT ONLY, \\n for line breaks, NO HTML
+- "to" field: email address ONLY, nothing else
 {link_rule}
 {att_rule}
 
-CRITICAL: body = PLAIN TEXT ONLY, use \\n for line breaks, no HTML.
-"to" field = ONLY the email address, nothing else.
-
-Return ONLY valid JSON, no markdown fences:
+═══════════════════════════════════════════════
+Return ONLY valid JSON (no markdown, no extra text):
+═══════════════════════════════════════════════
 {{
   "is_phishing": {"true" if is_phishing else "false"},
   "from": "{from_ex}",
@@ -1622,8 +1639,7 @@ Return ONLY valid JSON, no markdown fences:
   "body": "{body_ex}",
   "suspicious_link": "",
   "explanation": "{expl_ex}"
-}}"
-"""
+}}"""
 
 def generate_assess_email(role, index, is_phishing, language):
     # Generates one assessment email (phishing or legitimate).
