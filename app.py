@@ -154,6 +154,16 @@ ROLE_MAP = {
         "VPN, network, servers, software updates, IT helpdesk, security systems",
         "it"
     ),
+    "Other": (
+        "a general hospital employee in Saudi Arabia",
+        "any hospital department — clinical, administrative, or technical",
+        "other"
+    ),
+    "أخرى": (
+        "موظف عام في مستشفى سعودي",
+        "أي قسم في المستشفى — سريري أو إداري أو تقني",
+        "other"
+    ),
 }
 
 EN_NAMES = {
@@ -181,6 +191,14 @@ EN_NAMES = {
         "t.bandar.althubaiti@hospital.org",
         "t.nadia.alsalmi@hospital.org",
     ],
+    "other": [
+        "s.khalid.alharbi@hospital.org",
+        "s.sara.alqahtani@hospital.org",
+        "s.faisal.alzahrani@hospital.org",
+        "s.nora.alotaibi@hospital.org",
+        "s.ahmed.alshamri@hospital.org",
+        "s.hessa.aldosari@hospital.org",
+    ],
 }
 
 def get_recipient(role, index, language):
@@ -206,6 +224,58 @@ def get_shuffled_scenario_order():
     return st.session_state["scenario_order"]
 
 # =============================================================
+# =============================================================
+# FIX 7: FORCED SCENARIO DIVERSITY PER INDEX
+# كل مثال له سيناريو محدد مسبقاً — يمنع التكرار نهائياً
+# =============================================================
+FORCED_SCENARIOS = {
+    "admin": [
+        {"en": "SCENARIO: Fake supplier invoice — impersonate a medical equipment supplier requesting urgent payment of SAR 150,000. Must use a PDF attachment named invoice.pdf or similar.",
+         "ar": "السيناريو: فاتورة مورد مزيفة — انتحل هوية مورد معدات طبية يطلب دفع 150,000 ريال بشكل عاجل. استخدم مرفق PDF باسم invoice.pdf."},
+        {"en": "SCENARIO: Fake health insurance portal — claim the hospital staff insurance system requires employees to re-verify coverage details through a suspicious link. NO attachment.",
+         "ar": "السيناريو: بوابة تأمين صحي مزيفة — ادّعِ أن نظام تأمين الموظفين يحتاج تحديث بيانات التغطية عبر رابط مشبوه. بدون مرفق."},
+        {"en": "SCENARIO: Fake payroll system — claim the salary payment system requires staff to urgently update their bank account details to avoid delayed salary. NO attachment.",
+         "ar": "السيناريو: نظام رواتب مزيف — ادّعِ أن نظام صرف الرواتب يحتاج تحديث بيانات الحساب البنكي لتجنب تأخر الراتب. بدون مرفق."},
+        {"en": "SCENARIO: CEO/director impersonation — impersonate the hospital CEO urgently requesting the admin manager to process a financial transfer or share sensitive payroll data immediately. Pure social engineering, NO link, NO attachment.",
+         "ar": "السيناريو: انتحال هوية المدير التنفيذي — تظاهر بأنك المدير التنفيذي وتطلب من المدير الإداري تحويل مالي عاجل أو مشاركة بيانات الرواتب. هندسة اجتماعية فقط."},
+        {"en": "SCENARIO: Fake patient appointment system migration — claim the appointment booking system is being upgraded and staff must verify login credentials through a suspicious link. NO attachment.",
+         "ar": "السيناريو: ترحيل مزيف لنظام حجز المواعيد — ادّعِ أن النظام يُرقَّى ويطلب التحقق من بيانات الدخول عبر رابط مشبوه."},
+        {"en": "SCENARIO: Fake medical procurement portal — impersonate procurement system admin claiming a critical supplier contract expires this week and must be renewed via a suspicious link. NO attachment.",
+         "ar": "السيناريو: بوابة مشتريات طبية مزيفة — انتحل هوية مسؤول المشتريات وادّعِ أن عقد مورد حيوي ينتهي هذا الأسبوع ويجب تجديده عبر رابط مشبوه."},
+    ],
+    "clinical": [
+        {"en": "SCENARIO: Fake EMR system credential harvest — claim the hospital EMR system requires urgent re-verification of login credentials through a suspicious link.", "ar": "السيناريو: سرقة بيانات نظام السجلات الطبية — ادّعِ أن نظام السجلات يحتاج إعادة التحقق من بيانات الدخول."},
+        {"en": "SCENARIO: Malicious patient data PDF — send a fake urgent patient lab results update as a PDF attachment with malicious macros.", "ar": "السيناريو: مرفق PDF خبيث — أرسل تحديثاً مزيفاً لنتائج مختبر مريض عاجل كمرفق PDF."},
+        {"en": "SCENARIO: Fake MOH clinical protocol — impersonate MOH sending an urgent infection control protocol update requiring immediate acknowledgment via link.", "ar": "السيناريو: بروتوكول سريري مزيف من وزارة الصحة يطلب تأكيداً عاجلاً."},
+        {"en": "SCENARIO: Medical director impersonation — impersonate the medical director urgently requesting patient data or system access credentials. Pure social engineering.", "ar": "السيناريو: انتحال هوية المدير الطبي يطلب بيانات مرضى أو بيانات الوصول للأنظمة."},
+        {"en": "SCENARIO: Fake staff duty roster Excel — send a malicious Excel attachment claiming to contain the updated clinical staff schedule requiring immediate review.", "ar": "السيناريو: جدول مناوبات مزيف — أرسل ملف Excel خبيث يدّعي احتواءه على جدول العمل المحدث."},
+        {"en": "SCENARIO: Fake pharmacy system update — claim the pharmacy dispensing system requires urgent credential verification through a suspicious portal link.", "ar": "السيناريو: تحديث مزيف لنظام الصيدلية يطلب التحقق من بيانات الدخول."},
+    ],
+    "it": [
+        {"en": "SCENARIO: Fake VPN credential update — claim the hospital VPN gateway requires urgent re-authentication through a suspicious portal.", "ar": "السيناريو: تحديث مزيف لبيانات الـ VPN يطلب إعادة المصادقة."},
+        {"en": "SCENARIO: Fake SSL certificate expiry — claim the hospital website SSL certificate has expired and must be renewed immediately via a suspicious link.", "ar": "السيناريو: تنبيه مزيف بانتهاء شهادة SSL يطلب التجديد الفوري."},
+        {"en": "SCENARIO: Fake IT helpdesk remote access — impersonate IT helpdesk claiming a critical server issue requires remote access credentials immediately.", "ar": "السيناريو: مكتب مساعدة مزيف يطلب بيانات الوصول عن بُعد لحل مشكلة خادم حرجة."},
+        {"en": "SCENARIO: CIO impersonation — impersonate the Chief Information Officer urgently requesting server admin credentials or asking to disable security settings.", "ar": "السيناريو: انتحال هوية مدير تقنية المعلومات يطلب بيانات الخادم أو تعطيل إعدادات الأمان."},
+        {"en": "SCENARIO: Fake software license renewal — claim a critical hospital software license is expiring in 24 hours and requires immediate renewal via a suspicious portal.", "ar": "السيناريو: تجديد مزيف لترخيص برنامج حيوي ينتهي خلال 24 ساعة."},
+        {"en": "SCENARIO: Fake firewall policy update — send a malicious Word document claiming to contain a new mandatory firewall security policy requiring macro enablement.", "ar": "السيناريو: سياسة جدار ناري مزيفة — مستند Word يطلب تفعيل الماكرو."},
+    ],
+    "other": [
+        # مزيج متنوع من الثلاثة أدوار — واحد من كل نوع بالتناوب
+        {"en": "SCENARIO (Admin mix): Fake supplier invoice for medical equipment — urgent payment SAR 150,000. Use PDF attachment. Target: general hospital employee.",
+         "ar": "السيناريو (إداري): فاتورة مورد معدات طبية مزيفة تطلب دفع 150,000 ريال. مرفق PDF. الهدف: موظف عام في المستشفى."},
+        {"en": "SCENARIO (Clinical mix): Fake EMR system credential harvest — claim the hospital electronic medical records system requires urgent login re-verification via suspicious link. Target: general hospital employee.",
+         "ar": "السيناريو (سريري): سرقة بيانات نظام السجلات الطبية — ادّعِ أن النظام يحتاج إعادة التحقق من بيانات الدخول. الهدف: موظف عام."},
+        {"en": "SCENARIO (IT mix): Fake hospital network security alert — claim a critical security vulnerability was detected and employee must update credentials immediately via suspicious portal. Target: general hospital employee.",
+         "ar": "السيناريو (تقني): تنبيه أمني مزيف للشبكة — ادّعِ اكتشاف ثغرة حرجة وأن الموظف يجب تحديث بياناته فوراً. الهدف: موظف عام."},
+        {"en": "SCENARIO (Admin mix): Fake HR payroll notification — claim salary payment is on hold until employee updates bank account details via suspicious link. Target: general hospital employee.",
+         "ar": "السيناريو (إداري): إشعار رواتب مزيف — ادّعِ أن صرف الراتب موقوف حتى يحدّث الموظف بيانات حسابه البنكي. الهدف: موظف عام."},
+        {"en": "SCENARIO (Clinical mix): Fake MOH health alert — impersonate Ministry of Health sending urgent infection control protocol requiring immediate acknowledgment via link. Target: general hospital employee.",
+         "ar": "السيناريو (سريري): تنبيه صحي مزيف من وزارة الصحة يتطلب تأكيداً فورياً عبر رابط. الهدف: موظف عام."},
+        {"en": "SCENARIO (IT mix): Fake CEO/Director urgent request — impersonate hospital director urgently requesting employee to share login credentials or sensitive data immediately. Pure social engineering. Target: general hospital employee.",
+         "ar": "السيناريو (تقني/إداري): انتحال هوية مدير المستشفى يطلب من الموظف مشاركة بيانات الدخول أو معلومات حساسة فوراً. هندسة اجتماعية. الهدف: موظف عام."},
+    ],
+}
+
 # FIX 1: build_prompt — upgraded to llama-3.3-70b-versatile
 # and enhanced difficulty rules with more detail
 # =============================================================
@@ -244,9 +314,9 @@ def build_prompt(role, index, language):
             "CIO/CISO impersonation, fake SSL/firewall/license alert — MUST be healthcare IT content only."
         ),
         "other": (
-            "A general hospital employee in Saudi Arabia.",
-            "Any hospital department — clinical, administrative, or technical.",
-            "Choose freely any realistic phishing attack suitable for a Saudi hospital employee."
+            "A general hospital employee in Saudi Arabia (could be any department).",
+            "Any hospital area: clinical (patient records, EMR), administrative (billing, insurance, payroll), or IT (network, systems, helpdesk).",
+            "Use the MANDATORY SCENARIO provided — it rotates across all three role types for maximum variety."
         ),
     }
     r_desc, r_ctx, r_guidance = role_guidance.get(role_type, role_guidance["other"])
@@ -333,6 +403,11 @@ def build_prompt(role, index, language):
         ind_t_ex = "indicator title"
         ind_d_ex = "detailed technical explanation"
 
+    # FIX 7: Get forced scenario for this index
+    forced = FORCED_SCENARIOS.get(role_type, FORCED_SCENARIOS["admin"])
+    forced_scenario = forced[index % len(forced)]
+    scenario_instruction = forced_scenario["ar"] if is_ar else forced_scenario["en"]
+
     return f"""You are a cybersecurity expert creating phishing awareness training for Saudi healthcare.
 
 TRAINING EXAMPLE #{index + 1} of 6 | Variety seed: {session_seed}
@@ -341,10 +416,11 @@ TRAINING EXAMPLE #{index + 1} of 6 | Variety seed: {session_seed}
 Role: {r_desc}
 Context: {r_ctx}
 
-━━━ YOUR TASK ━━━
-{r_guidance}
-Be CREATIVE — choose a different attack type than typical examples.
-Each of the 6 examples must be a COMPLETELY DIFFERENT attack type and format.
+━━━ YOUR TASK — MANDATORY SCENARIO ━━━
+You MUST generate this EXACT scenario type — do NOT substitute or change it:
+{scenario_instruction}
+
+This scenario is NON-NEGOTIABLE. Generate the email body, subject, and sender to match this specific scenario exactly.
 
 ━━━ DIFFICULTY ━━━
 {diff_rule}
@@ -389,8 +465,8 @@ def build_assess_prompt(role, index, is_phishing, language):
             "hospital network, VPN, servers, EMR system, cloud backup, SSL, firewall, software licenses, IT helpdesk"
         ),
         "other": (
-            "a general hospital employee in Saudi Arabia",
-            "any hospital department"
+            "a general hospital employee in Saudi Arabia (any department)",
+            "clinical areas (EMR, patient records), administrative tasks (billing, insurance, payroll), or IT systems (network, helpdesk)"
         ),
     }
     r_desc, r_ctx = role_guidance.get(role_type, role_guidance["other"])
@@ -464,12 +540,200 @@ def build_assess_prompt(role, index, is_phishing, language):
     diff_rule = diff_rules.get(difficulty, diff_rules["medium"])
     task = task_p if is_phishing else task_l
 
+    # FIX 7b: Forced scenario for assessment based on index + is_phishing
+    assess_scenarios = {
+        "admin": {
+            True: [  # phishing scenarios
+                "MANDATORY: Fake supplier invoice for medical equipment — urgent payment request SAR 150,000. Use PDF attachment.",
+                "MANDATORY: Fake health insurance portal — re-verify coverage details via suspicious link.",
+                "MANDATORY: Fake payroll system — update bank account details urgently.",
+                "MANDATORY: CEO impersonation — urgent financial transfer request. Pure social engineering.",
+                "MANDATORY: Fake MOH accreditation document portal — upload compliance files via suspicious link.",
+            ],
+            False: [  # legitimate scenarios
+                "MANDATORY: Legitimate reminder about weekly patient appointment schedule. From official hospital.org domain.",
+                "MANDATORY: Legitimate HR notice about upcoming staff training session. From official hospital.org domain.",
+                "MANDATORY: Legitimate procurement update about approved medical supply order. From official hospital.org domain.",
+                "MANDATORY: Legitimate payslip notification from official HR system. From official hospital.org domain.",
+                "MANDATORY: Legitimate department meeting invitation from manager. From official hospital.org domain.",
+            ],
+        },
+        "clinical": {
+            True: [
+                "MANDATORY: Fake EMR login credential harvest via suspicious link.",
+                "MANDATORY: Fake patient lab results as malicious PDF attachment.",
+                "MANDATORY: Fake MOH clinical alert requiring immediate link click.",
+                "MANDATORY: Medical director impersonation requesting patient data.",
+                "MANDATORY: Fake clinical schedule as malicious Excel attachment.",
+            ],
+            False: [
+                "MANDATORY: Legitimate shift schedule update from head nurse. Official hospital.org domain.",
+                "MANDATORY: Legitimate patient case review reminder. Official hospital.org domain.",
+                "MANDATORY: Legitimate MOH training reminder. Official moh.gov.sa domain.",
+                "MANDATORY: Legitimate infection control policy update. Official hospital.org domain.",
+                "MANDATORY: Legitimate department meeting from medical director. Official hospital.org domain.",
+            ],
+        },
+        "it": {
+            True: [
+                "MANDATORY: Fake VPN credential update via suspicious portal.",
+                "MANDATORY: Fake SSL certificate expiry requiring immediate action.",
+                "MANDATORY: Fake IT helpdesk requesting remote access credentials.",
+                "MANDATORY: CIO impersonation requesting server credentials.",
+                "MANDATORY: Fake software license renewal via suspicious link.",
+            ],
+            False: [
+                "MANDATORY: Legitimate scheduled server maintenance notice. Official hospital.org domain.",
+                "MANDATORY: Legitimate software update announcement from IT department. Official hospital.org domain.",
+                "MANDATORY: Legitimate network monitoring alert from official system. Official hospital.org domain.",
+                "MANDATORY: Legitimate IT helpdesk ticket resolution. Official hospital.org domain.",
+                "MANDATORY: Legitimate cybersecurity training reminder. Official hospital.org domain.",
+            ],
+        },
+        "other": {
+            True: [
+                "MANDATORY (Admin type): Fake supplier invoice — urgent medical equipment payment request. Use PDF attachment.",
+                "MANDATORY (Clinical type): Fake EMR system login — credential harvest via suspicious portal link.",
+                "MANDATORY (IT type): Fake hospital network security alert — urgent credential update required.",
+                "MANDATORY (Admin type): Fake payroll notification — salary on hold until bank details updated.",
+                "MANDATORY (Clinical type): Fake MOH health directive — urgent acknowledgment required via link.",
+            ],
+            False: [
+                "MANDATORY: Legitimate weekly schedule update from department head. Official hospital.org domain. No suspicious elements.",
+                "MANDATORY: Legitimate HR training reminder for all staff. Official hospital.org domain. No links or requests.",
+                "MANDATORY: Legitimate hospital policy update notice. Official hospital.org domain. No credential requests.",
+                "MANDATORY: Legitimate payslip notification from HR system. Official hospital.org domain. Routine notification.",
+                "MANDATORY: Legitimate departmental meeting invitation from manager. Official hospital.org domain. Normal business communication.",
+            ],
+        },
+    }
+    role_assess = assess_scenarios.get(role_type, assess_scenarios["admin"])
+    phish_list  = role_assess[True]
+    legit_list  = role_assess[False]
+
+    # FIX 8: حساب الـ rank الصحيح بدلاً من index الكلي
+    # نحتاج نعرف "هذا الـ phishing/legit الثاني أم الثالث؟"
+    # نستخدم assess_pattern من session_state إذا متوفر
+    pattern = st.session_state.get("assess_pattern", [])
+    if pattern and index < len(pattern):
+        if is_phishing:
+            # عدد الأسئلة الـ phishing قبل هذا السؤال
+            rank = sum(1 for i in range(index) if pattern[i] == True)
+        else:
+            # عدد الأسئلة الـ legit قبل هذا السؤال
+            rank = sum(1 for i in range(index) if pattern[i] == False)
+    else:
+        rank = index
+
+    if is_phishing:
+        forced_task_raw = phish_list[rank % len(phish_list)]
+    else:
+        forced_task_raw = legit_list[rank % len(legit_list)]
+
+    # FIX 9: ترجمة forced_task حسب اللغة
+    ASSESS_TRANSLATIONS = {
+        # Admin phishing
+        "MANDATORY: Fake supplier invoice for medical equipment — urgent payment request SAR 150,000. Use PDF attachment.":
+            "إجباري: فاتورة مورد معدات طبية مزيفة — طلب دفع عاجل 150,000 ريال. استخدم مرفق PDF.",
+        "MANDATORY: Fake health insurance portal — re-verify coverage details via suspicious link.":
+            "إجباري: بوابة تأمين صحي مزيفة — إعادة التحقق من بيانات التغطية عبر رابط مشبوه.",
+        "MANDATORY: Fake payroll system — update bank account details urgently.":
+            "إجباري: نظام رواتب مزيف — تحديث بيانات الحساب البنكي بشكل عاجل.",
+        "MANDATORY: CEO impersonation — urgent financial transfer request. Pure social engineering.":
+            "إجباري: انتحال هوية المدير التنفيذي — طلب تحويل مالي عاجل. هندسة اجتماعية.",
+        "MANDATORY: Fake MOH accreditation document portal — upload compliance files via suspicious link.":
+            "إجباري: بوابة اعتماد MOH مزيفة — رفع مستندات الامتثال عبر رابط مشبوه.",
+        # Admin legit
+        "MANDATORY: Legitimate reminder about weekly patient appointment schedule. From official hospital.org domain.":
+            "إجباري: تذكير شرعي بجدول مواعيد المرضى الأسبوعي. من نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate HR notice about upcoming staff training session. From official hospital.org domain.":
+            "إجباري: إشعار موارد بشرية شرعي بجلسة تدريبية قادمة. من نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate procurement update about approved medical supply order. From official hospital.org domain.":
+            "إجباري: تحديث مشتريات شرعي لطلب توريد طبي معتمد. من نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate payslip notification from official HR system. From official hospital.org domain.":
+            "إجباري: إشعار راتب شرعي من نظام الموارد البشرية الرسمي. من نطاق hospital.org.",
+        "MANDATORY: Legitimate department meeting invitation from manager. From official hospital.org domain.":
+            "إجباري: دعوة اجتماع قسم شرعية من المدير. من نطاق hospital.org الرسمي.",
+        # Clinical phishing
+        "MANDATORY: Fake EMR login credential harvest via suspicious link.":
+            "إجباري: سرقة بيانات دخول نظام السجلات الطبية عبر رابط مشبوه.",
+        "MANDATORY: Fake patient lab results as malicious PDF attachment.":
+            "إجباري: نتائج مختبر مرضى مزيفة كمرفق PDF خبيث.",
+        "MANDATORY: Fake MOH clinical alert requiring immediate link click.":
+            "إجباري: تنبيه سريري مزيف من وزارة الصحة يتطلب نقر رابط فوري.",
+        "MANDATORY: Medical director impersonation requesting patient data.":
+            "إجباري: انتحال هوية المدير الطبي يطلب بيانات المرضى.",
+        "MANDATORY: Fake clinical schedule as malicious Excel attachment.":
+            "إجباري: جدول مناوبات سريري مزيف كمرفق Excel خبيث.",
+        # Clinical legit
+        "MANDATORY: Legitimate shift schedule update from head nurse. Official hospital.org domain.":
+            "إجباري: تحديث جدول المناوبة شرعي من رئيسة التمريض. نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate patient case review reminder. Official hospital.org domain.":
+            "إجباري: تذكير شرعي بمراجعة حالة مريض. نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate MOH training reminder. Official moh.gov.sa domain.":
+            "إجباري: تذكير تدريب شرعي من وزارة الصحة. نطاق moh.gov.sa الرسمي.",
+        "MANDATORY: Legitimate infection control policy update. Official hospital.org domain.":
+            "إجباري: تحديث سياسة مكافحة العدوى شرعي. نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate department meeting from medical director. Official hospital.org domain.":
+            "إجباري: اجتماع قسم شرعي من المدير الطبي. نطاق hospital.org الرسمي.",
+        # IT phishing
+        "MANDATORY: Fake VPN credential update via suspicious portal.":
+            "إجباري: تحديث بيانات VPN مزيف عبر بوابة مشبوهة.",
+        "MANDATORY: Fake SSL certificate expiry requiring immediate action.":
+            "إجباري: تنبيه انتهاء شهادة SSL مزيف يتطلب إجراءً فورياً.",
+        "MANDATORY: Fake IT helpdesk requesting remote access credentials.":
+            "إجباري: مكتب مساعدة IT مزيف يطلب بيانات الوصول عن بُعد.",
+        "MANDATORY: CIO impersonation requesting server credentials.":
+            "إجباري: انتحال هوية مدير تقنية المعلومات يطلب بيانات الخادم.",
+        "MANDATORY: Fake software license renewal via suspicious link.":
+            "إجباري: تجديد ترخيص برنامج مزيف عبر رابط مشبوه.",
+        # IT legit
+        "MANDATORY: Legitimate scheduled server maintenance notice. Official hospital.org domain.":
+            "إجباري: إشعار صيانة خادم مجدولة شرعي. نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate software update announcement from IT department. Official hospital.org domain.":
+            "إجباري: إعلان تحديث برنامج شرعي من قسم تقنية المعلومات. نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate network monitoring alert from official system. Official hospital.org domain.":
+            "إجباري: تنبيه مراقبة شبكة شرعي من النظام الرسمي. نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate IT helpdesk ticket resolution. Official hospital.org domain.":
+            "إجباري: حل تذكرة مكتب المساعدة شرعي. نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate cybersecurity training reminder. Official hospital.org domain.":
+            "إجباري: تذكير تدريب الأمن السيبراني شرعي. نطاق hospital.org الرسمي.",
+        # Other phishing
+        "MANDATORY (Admin type): Fake supplier invoice — urgent medical equipment payment request. Use PDF attachment.":
+            "إجباري (إداري): فاتورة مورد مزيفة — طلب دفع عاجل لمعدات طبية. مرفق PDF.",
+        "MANDATORY (Clinical type): Fake EMR system login — credential harvest via suspicious portal link.":
+            "إجباري (سريري): دخول مزيف لنظام السجلات الطبية — سرقة بيانات عبر رابط مشبوه.",
+        "MANDATORY (IT type): Fake hospital network security alert — urgent credential update required.":
+            "إجباري (تقني): تنبيه أمني مزيف للشبكة — تحديث بيانات الدخول عاجل.",
+        "MANDATORY (Admin type): Fake payroll notification — salary on hold until bank details updated.":
+            "إجباري (إداري): إشعار راتب مزيف — الراتب موقوف حتى تحديث بيانات الحساب البنكي.",
+        "MANDATORY (Clinical type): Fake MOH health directive — urgent acknowledgment required via link.":
+            "إجباري (سريري): توجيه صحي مزيف من وزارة الصحة — تأكيد عاجل عبر رابط.",
+        # Other legit
+        "MANDATORY: Legitimate weekly schedule update from department head. Official hospital.org domain. No suspicious elements.":
+            "إجباري: تحديث جدول أسبوعي شرعي من رئيس القسم. نطاق hospital.org الرسمي. لا عناصر مشبوهة.",
+        "MANDATORY: Legitimate HR training reminder for all staff. Official hospital.org domain. No links or requests.":
+            "إجباري: تذكير تدريب موارد بشرية شرعي لجميع الموظفين. نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate hospital policy update notice. Official hospital.org domain. No credential requests.":
+            "إجباري: إشعار تحديث سياسة المستشفى الشرعي. نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate payslip notification from HR system. Official hospital.org domain. Routine notification.":
+            "إجباري: إشعار راتب شرعي من نظام الموارد البشرية. نطاق hospital.org الرسمي.",
+        "MANDATORY: Legitimate departmental meeting invitation from manager. Official hospital.org domain. Normal business communication.":
+            "إجباري: دعوة اجتماع قسم شرعية من المدير. نطاق hospital.org الرسمي.",
+    }
+    if is_ar:
+        forced_task = ASSESS_TRANSLATIONS.get(forced_task_raw, forced_task_raw)
+    else:
+        forced_task = forced_task_raw
+
     return f"""Phishing awareness assessment email for Saudi healthcare. Seed:{session_seed}
 
 TARGET: {r_desc}
 CONTEXT: {r_ctx}
 
-TASK: {task}
+TASK — MANDATORY SCENARIO (do NOT change this):
+{forced_task}
+Additional context: {task}
 
 DIFFICULTY: {diff_rule}
 
@@ -528,6 +792,12 @@ def get_system_prompt():
             "CONTENT: Must relate to VPN access, network infrastructure, server maintenance, EMR system updates, SSL certificates, firewall rules, software licenses, IT helpdesk, or endpoint security.\n"
             "DO NOT use clinical or administrative content."
         ),
+        "other": (
+            "TARGET ROLE: General hospital employee — could be from any department.\n"
+            "GREETING: Use 'Dear [Name],' or 'Dear Colleague,' — avoid specific titles like 'Dr.' unless the scenario requires it.\n"
+            "CONTENT: Follow the MANDATORY SCENARIO exactly — it already specifies the department context (admin/clinical/IT). Generate content that any hospital employee could plausibly receive.\n"
+            "The scenario rotates across all three role types to ensure maximum variety."
+        ),
     }
     role_instruction = role_greetings.get(role_type, role_greetings["admin"])
 
@@ -535,37 +805,37 @@ def get_system_prompt():
         "easy": (
             "You are a cybersecurity trainer generating phishing email examples.\n\n"
             f"{role_instruction}\n\n"
-            "EASY level RULES — you MUST follow ALL of these strictly:\n"
-            "1. Use a CLEARLY FAKE domain (e.g. hosp1tal-updates.xyz, hospital-secure.net, moh-alert.xyz)\n"
-            "2. Include EXACTLY 2 obvious spelling mistakes in the body (e.g. 'clic' instead of 'click', 'acess' instead of 'access')\n"
-            "3. Use ALL-CAPS for at least 2 sentences to show aggressive urgency\n"
-            "4. Use ONLY generic greeting: 'Dear Staff' — NEVER use a personal name\n"
-            "5. Make an obviously suspicious request (share password, enter full credentials immediately)\n"
-            "These rules are NON-NEGOTIABLE for EASY difficulty."
+            "EASY level RULES — ALL mandatory:\n"
+            f"1. Use a CLEARLY FAKE domain suited to the role (admin: hosp1tal-hr.xyz / moh-pay.net | clinical: emr-secure.xyz / medrecords.net | it: vpn-update.xyz / sysadmin-alert.net)\n"
+            "2. Include EXACTLY 2 obvious spelling mistakes in the body\n"
+            "3. Use ALL-CAPS for at least 2 sentences — aggressive urgency\n"
+            "4. Generic greeting ONLY: \'Dear Staff\' or \'Dear Team\' — NO personal name\n"
+            "5. Blatant suspicious request matching the scenario (urgent payment / share password / enter credentials)\n"
+            "These rules are NON-NEGOTIABLE."
         ),
         "medium": (
             "You are a cybersecurity trainer generating phishing email examples.\n\n"
             f"{role_instruction}\n\n"
-            "MEDIUM level RULES — you MUST follow ALL of these strictly:\n"
-            "1. Use a slightly suspicious domain that looks almost real (e.g. hospital-hr-portal.net, moh-staff-portal.com) — NOT obviously fake\n"
-            "2. Include EXACTLY 1 minor spelling mistake in the body — just one subtle error\n"
-            "3. Use normal sentence case — NO ALL-CAPS sentences at all\n"
-            "4. Show moderate urgency with a deadline like 'Please respond by end of week' — NOT threatening language\n"
-            "5. Use semi-personal greeting appropriate to the role (see TARGET ROLE above)\n"
-            "6. Make a request that is unusual but not impossible in a workplace\n"
-            "These rules are NON-NEGOTIABLE for MEDIUM difficulty. Do NOT use ALL-CAPS urgency."
+            "MEDIUM level RULES — ALL mandatory:\n"
+            f"1. Use a slightly suspicious domain (admin: hospital-hr-portal.net / moh-billing.com | clinical: emr-health-sa.net / moh-clinic.com | it: vpn-hospital-sa.net / itsupport-moh.com)\n"
+            "2. Include EXACTLY 1 minor spelling mistake — subtle, one word only\n"
+            "3. ZERO ALL-CAPS — use normal sentence case throughout\n"
+            "4. Moderate urgency only: \'Please respond by end of week\' — no threatening language\n"
+            "5. Semi-personal greeting matching sub-role (e.g. \'Dear Ms. Al-Zahrani,\')\n"
+            "6. Unusual but plausible request for the workplace context\n"
+            "These rules are NON-NEGOTIABLE. NO ALL-CAPS under any circumstances."
         ),
         "hard": (
             "You are a cybersecurity trainer generating phishing email examples.\n\n"
             f"{role_instruction}\n\n"
-            "HARD level RULES — you MUST follow ALL of these strictly:\n"
-            "1. Use a domain that looks almost identical to the real one with ONE tiny character change only (e.g. hosp1tal.org, hospital-sa.net, moh.gov-sa.com, saudimoh.net)\n"
-            "2. ZERO spelling or grammar mistakes — perfect professional language throughout\n"
-            "3. ZERO ALL-CAPS — completely normal professional tone\n"
-            "4. Use subtle polite urgency ONLY (e.g. 'Kindly review before end of business day')\n"
-            "5. Use full name and exact job title appropriate to the role in greeting\n"
-            "6. Include ONLY ONE subtle red flag — everything else must look completely legitimate\n"
-            "These rules are NON-NEGOTIABLE for HARD difficulty. The email must look almost completely real."
+            "HARD level RULES — ALL mandatory:\n"
+            f"1. Domain with ONE tiny change only (admin: hosp1tal.org / moh.gov-sa.com | clinical: moh.gov.sa-health.com / hosp1tal-clinic.org | it: hosp1tal-it.org / moh-itsupport.sa.com)\n"
+            "2. ZERO spelling or grammar mistakes — flawless professional language\n"
+            "3. ZERO ALL-CAPS — completely professional tone throughout\n"
+            "4. Polite subtle urgency ONLY: \'Kindly review before end of business day\'\n"
+            "5. Full name + exact job title in greeting matching the sub-role\n"
+            "6. ONLY ONE subtle red flag (the domain) — everything else perfectly legitimate\n"
+            "These rules are NON-NEGOTIABLE. The email must look almost completely real."
         ),
     }
     return sys_prompts.get(difficulty, sys_prompts["medium"])
