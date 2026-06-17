@@ -16,17 +16,14 @@
 #        -> RESULTS -> PERFORMANCE REPORT
 # =============================================================
 
-# == Standard library imports ==================================
-import streamlit as st   # Web UI framework - renders all pages
-import json               # Parses JSON from AI API responses
-import requests           # HTTP client for Groq API calls
-import os                 # Reads GROQ_API_KEY environment variable
-import re                 # Regex for text cleaning/validation
-import html as html_lib   # HTML-escapes user-facing content (security)
-import random             # Shuffles scenario order to avoid repetition
+import streamlit as st
+import json
+import requests
+import os
+import re
+import html as html_lib
+import random
 
-# == Streamlit page config =====================================
-# Configures the browser tab, layout, and sidebar visibility
 st.set_page_config(
     page_title="AI Phishing Awareness",
     page_icon="🛡️",
@@ -34,102 +31,70 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# == Session state initialisation ==============================
-# Streamlit reruns the full script on every user interaction.
-# st.session_state acts as persistent storage between reruns.
-# These keys are used throughout the app:
-#   language      : "English" or "Arabic" (controls UI direction)
-#   page          : current page ("home","learning","assessment",etc.)
-#   role          : user-selected job role (e.g. "Clinical")
-#   example_index : which learning example is currently shown (0-5)
-#   emails        : cache of AI-generated emails {index: email_dict}
 for k, v in [("language","English"),("page","home"),("role",""),
               ("example_index",0),("emails",{}),("difficulty","medium"),
               ("user_name",""),("user_email",""),("ai_provider","groq")]:
     if k not in st.session_state:
         st.session_state[k] = v
 
-# == Query params navigation handler ============================
 _nav = st.query_params.get("nav", "")
 if _nav in ("login", "register"):
     st.session_state["login_mode"] = _nav
     st.session_state["page"] = "login"
-    # Preserve language from URL if passed
     _lang = st.query_params.get("lang", "")
     if _lang in ("Arabic", "English"):
         st.session_state["language"] = _lang
-    st.query_params.clear()   # clear URL — no rerun needed
-
-# == Global helper functions ===================================
+    st.query_params.clear()
 
 def set_language(lang):
     st.session_state["language"] = lang
     st.session_state["lang_explicitly_chosen"] = True
 
 def t(en, ar):
-    # Translation helper used everywhere in the UI.
-    # Returns Arabic string if Arabic mode is active, else English.
-    # Example: t("Start", "ابدأ") returns "ابدأ" in Arabic mode.
     return ar if st.session_state["language"] == "Arabic" else en
 
 def go_to_learning(role):
-    # Navigates to the Learning Phase.
-    # Resets example index and clears cached emails so fresh
-    # AI content is generated for each new training session.
     st.session_state["role"]          = role
     st.session_state["page"]          = "learning"
     st.session_state["example_index"] = 0
     st.session_state["emails"]        = {}
 
-# ── Text cleaners ──────────────────────────────────────────
 def clean_foreign_only(text):
     if not text: return text
     text = re.sub(r'<[^>]+>', '', text)
-    # Chinese, Japanese, Korean
     text = re.sub(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\u3400-\u4dbf\uac00-\ud7af\u1100-\u11ff]', '', text)
-    # Cyrillic (Russian etc.)
     text = re.sub(r'[\u0400-\u04ff]', '', text)
-    # Extended Latin (French accents etc.)
     text = re.sub(r'[\u0100-\u017f]', '', text)
-    # Vietnamese
     text = re.sub(r'[\u1ea0-\u1ef9]', '', text)
-    # Devanagari (Hindi/Sanskrit like मर)
     text = re.sub(r'[\u0900-\u097f]', '', text)
-    # Thai
     text = re.sub(r'[\u0e00-\u0e7f]', '', text)
-    # Georgian, Armenian, Hebrew
     text = re.sub(r'[\u10a0-\u10ff\u0530-\u058f\u05d0-\u05ff]', '', text)
-    # Control characters
     text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
     text = re.sub(r'  +', ' ', text).strip()
     return text
 
-# Allowed Latin patterns inside Arabic text (URLs, emails, file extensions, numbers)
 _ALLOWED_LATIN_RE = re.compile(
     r'^(https?://[^\s]+|[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}|\.(?:pdf|xlsx|docx|txt|csv|zip|exe)|[0-9]+)$',
     re.IGNORECASE
 )
 
 def remove_foreign_latin_words(text):
-    """Remove standalone Latin words (English, Turkish, Vietnamese…) from Arabic text,
-    while preserving URLs, emails, file extensions and numbers."""
     if not text: return text
     arabic_chars = len(re.findall(r'[\u0600-\u06ff]', text))
     total_chars  = len(re.sub(r'\s', '', text))
     if total_chars == 0 or arabic_chars / total_chars < 0.25:
-        return text  # not Arabic-dominant – leave untouched
+        return text
     def keep_token(tok):
-        if _ALLOWED_LATIN_RE.match(tok): return tok          # URL / email / number
-        if re.search(r'[\u0600-\u06ff]', tok): return tok    # contains Arabic
-        if re.match(r'^[\u060c\u061b\u061f،؛؟!.,;:\-\u2013\u2014()\[\]{}\'"]+$', tok): return tok  # punctuation
-        if re.match(r'^[a-zA-Z\u00c0-\u024f]+$', tok): return ''   # any Latin word → remove (including single letters)
+        if _ALLOWED_LATIN_RE.match(tok): return tok
+        if re.search(r'[\u0600-\u06ff]', tok): return tok
+        if re.match(r'^[\u060c\u061b\u061f،؛؟!.,;:\-\u2013\u2014()\[\]{}\'"]+$', tok): return tok
+        if re.match(r'^[a-zA-Z\u00c0-\u024f]+$', tok): return ''
         return tok
     tokens  = re.split(r'(\s+)', text)
     cleaned = ''.join(keep_token(t) for t in tokens)
-    # Remove mixed Latin-Arabic tokens like "used-في" or "HRالـ"
-    cleaned = re.sub(r'[a-zA-Z]{1,}[-_](?=[\u0600-\u06ff])', '', cleaned)   # Latin-عربي
-    cleaned = re.sub(r'(?<=[\u0600-\u06ff])[-_]?[a-zA-Z]{1,}', '', cleaned) # عربي-Latin
-    cleaned = re.sub(r'[a-zA-Z]{1,}(?=[\u0600-\u06ff])', '', cleaned)        # HRالـ (no sep)
+    cleaned = re.sub(r'[a-zA-Z]{1,}[-_](?=[\u0600-\u06ff])', '', cleaned)
+    cleaned = re.sub(r'(?<=[\u0600-\u06ff])[-_]?[a-zA-Z]{1,}', '', cleaned)
+    cleaned = re.sub(r'[a-zA-Z]{1,}(?=[\u0600-\u06ff])', '', cleaned)
     cleaned = re.sub(r'  +', ' ', cleaned).strip()
     cleaned = re.sub(r'\s([،؛،,.;:])', r'\1', cleaned)
     return cleaned
@@ -141,40 +106,23 @@ def clean_email_field(addr):
     return addr.strip()
 
 def extract_to_email(to_val):
-    """Always return clean email only — no Arabic text mixed in."""
     if not to_val: return 'employee@hospital.org'
-    # Extract just the email address part
     m = re.search(r'[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}', to_val)
     return m.group(0) if m else 'employee@hospital.org'
 
 def fix_json_newlines(s):
-    # Fixes a common LLM output issue: real newlines inside JSON strings.
-    # The AI sometimes puts actual line breaks inside string values,
-    # which breaks json.loads(). This function escapes them to \n.
-    # Works by tracking whether we are inside a quoted string or not.
     result, in_string, i = [], False, 0
     while i < len(s):
         c = s[i]
         if c == '"' and (i == 0 or s[i-1] != '\\'):
             in_string = not in_string
-        if in_string and c == '\n':   result.append('\\n')   # escape real newline
-        elif in_string and c == '\r': result.append('\\r')   # escape carriage return
-        elif in_string and c == '\t': result.append('\\t')   # escape tab
+        if in_string and c == '\n':   result.append('\\n')
+        elif in_string and c == '\r': result.append('\\r')
+        elif in_string and c == '\t': result.append('\\t')
         else:                         result.append(c)
         i += 1
     return ''.join(result)
 
-# =============================================================
-# ROLE CONTEXT MAP
-# -------------------------------------------------------------
-# Maps user-selected job roles to:
-#   [0] Human-readable role description (used in AI prompt)
-#   [1] Work context keywords (makes AI output role-relevant)
-#   [2] Internal role type key: "clinical", "admin", or "it"
-#       Used to pick the correct scenario description and
-#       recipient email pool.
-# Supports both Arabic and English role names.
-# =============================================================
 ROLE_MAP = {
     "سريري": (
         "ممرض أو طبيب يعمل في مستشفى",
@@ -207,10 +155,7 @@ ROLE_MAP = {
         "it"
     ),
 }
-# ══════════════════════════════════════════════════════════
-#  RECIPIENT NAME GENERATOR
-# ══════════════════════════════════════════════════════════
-# AR_NAMES removed — always use Latin email addresses
+
 EN_NAMES = {
     "clinical": [
         "dr.sarah.almutairi@hospital.org",
@@ -239,187 +184,11 @@ EN_NAMES = {
 }
 
 def get_recipient(role, index, language):
-    """Return a realistic Latin email recipient — always Latin regardless of language."""
     role_info = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
     _, _, role_type = role_info
     pool = EN_NAMES.get(role_type, EN_NAMES["clinical"])
     return pool[index % len(pool)]
 
-
-
-# ══════════════════════════════════════════════════════════
-#  PHISHING SCENARIOS — role-aware descriptions
-# ══════════════════════════════════════════════════════════
-def get_role_scenario_desc(scenario_key, role_type, is_ar):
-    """Return role-specific scenario description."""
-    descs = {
-        "link": {
-            "clinical": (
-                "Generate an email targeting a clinical staff member (nurse/doctor). "
-                "It contains a suspicious link asking them to verify their hospital EMR system login. "
-                "The link MUST appear in body as plain text http:// URL pointing to a fake domain.",
-                "أنشئ رسالة تستهدف موظفاً سريرياً (ممرض/طبيب). تحتوي على رابط مشبوه "
-                "يطلب منه التحقق من بيانات دخوله لنظام السجلات الطبية. "
-                "يجب أن يظهر الرابط في النص كنص عادي http:// يشير لنطاق مزيف."
-            ),
-            "admin": (
-                "Generate an email targeting an admin/HR manager. "
-                "It contains a suspicious link asking them to update payroll system credentials. "
-                "The link MUST appear in body as plain text http:// URL pointing to a fake domain.",
-                "أنشئ رسالة تستهدف مديراً إدارياً. تحتوي على رابط مشبوه "
-                "يطلب منه تحديث بيانات دخول نظام الرواتب. "
-                "يجب أن يظهر الرابط في النص كنص عادي http:// يشير لنطاق مزيف."
-            ),
-            "it": (
-                "Generate an email targeting an IT specialist. "
-                "It contains a suspicious link claiming a critical server security update is required. "
-                "The link MUST appear in body as plain text http:// URL pointing to a fake domain.",
-                "أنشئ رسالة تستهدف متخصص تقنية معلومات. تحتوي على رابط مشبوه "
-                "يدّعي وجوب تثبيت تحديث أمني عاجل للخادم. "
-                "يجب أن يظهر الرابط في النص كنص عادي http:// يشير لنطاق مزيف."
-            ),
-        },
-        "pdf": {
-            "clinical": (
-                "Generate an email targeting a nurse/doctor with a PDF attachment "
-                "(e.g. patient_data_update.pdf or clinical_protocol.pdf). "
-                "Body urgently asks to open it. NO link.",
-                "أنشئ رسالة تستهدف ممرضاً أو طبيباً تحتوي على مرفق PDF "
-                "(مثل: تحديث_بيانات_المريض.pdf أو بروتوكول_سريري.pdf). "
-                "النص يطلب فتحه بشكل عاجل. لا رابط."
-            ),
-            "admin": (
-                "Generate an email targeting an admin manager with a PDF attachment "
-                "(e.g. payroll_report_Q1.pdf or hr_policy_update.pdf). "
-                "Body urgently asks to open it. NO link.",
-                "أنشئ رسالة تستهدف مديراً إدارياً تحتوي على مرفق PDF "
-                "(مثل: تقرير_الرواتب_الربع_الأول.pdf أو تحديث_سياسات_الموارد_البشرية.pdf). "
-                "النص يطلب فتحه بشكل عاجل. لا رابط."
-            ),
-            "it": (
-                "Generate an email targeting an IT specialist with a PDF attachment "
-                "(e.g. network_security_audit.pdf or server_maintenance_report.pdf). "
-                "Body urgently asks to open it. NO link.",
-                "أنشئ رسالة تستهدف متخصص تقنية معلومات تحتوي على مرفق PDF "
-                "(مثل: تقرير_تدقيق_الشبكة.pdf أو تقرير_صيانة_الخادم.pdf). "
-                "النص يطلب فتحه بشكل عاجل. لا رابط."
-            ),
-        },
-        "xlsx": {
-            "clinical": (
-                "Generate an email targeting clinical staff with an Excel attachment "
-                "(e.g. staff_schedule_update.xlsx or patient_roster.xlsx). "
-                "Body asks to open and fill it. NO suspicious link.",
-                "أنشئ رسالة تستهدف الكادر السريري تحتوي على مرفق Excel "
-                "(مثل: جدول_العمل_المحدث.xlsx أو قائمة_المرضى.xlsx). "
-                "النص يطلب فتحه وتعبئته. لا رابط مشبوه."
-            ),
-            "admin": (
-                "Generate an email targeting an admin manager with an Excel attachment "
-                "(e.g. employee_data_form.xlsx or budget_approval.xlsx). "
-                "Body asks to open and fill it. NO suspicious link.",
-                "أنشئ رسالة تستهدف مديراً إدارياً تحتوي على مرفق Excel "
-                "(مثل: نموذج_بيانات_الموظفين.xlsx أو اعتماد_الميزانية.xlsx). "
-                "النص يطلب فتحه وتعبئته. لا رابط مشبوه."
-            ),
-            "it": (
-                "Generate an email targeting an IT specialist with an Excel attachment "
-                "(e.g. asset_inventory_update.xlsx or system_access_log.xlsx). "
-                "Body asks to open and fill it. NO suspicious link.",
-                "أنشئ رسالة تستهدف متخصص تقنية معلومات تحتوي على مرفق Excel "
-                "(مثل: تحديث_جرد_الأصول.xlsx أو سجل_الوصول_للنظام.xlsx). "
-                "النص يطلب فتحه وتعبئته. لا رابط مشبوه."
-            ),
-        },
-        "docx": {
-            "clinical": (
-                "Generate an email targeting clinical staff with a Word doc attachment "
-                "(e.g. clinical_guidelines_2024.docx). Body asks to Enable Macros to view content. NO link.",
-                "أنشئ رسالة تستهدف الكادر السريري تحتوي على مرفق Word "
-                "(مثل: إرشادات_سريرية_2024.docx). النص يطلب تفعيل الماكرو لعرض المحتوى. لا رابط."
-            ),
-            "admin": (
-                "Generate an email targeting admin staff with a Word doc attachment "
-                "(e.g. hr_policy_update_2024.docx). Body asks to Enable Macros to view content. NO link.",
-                "أنشئ رسالة تستهدف الكادر الإداري تحتوي على مرفق Word "
-                "(مثل: تحديث_سياسات_الموارد_البشرية_2024.docx). النص يطلب تفعيل الماكرو. لا رابط."
-            ),
-            "it": (
-                "Generate an email targeting IT staff with a Word doc attachment "
-                "(e.g. it_security_policy_2024.docx). Body asks to Enable Macros to view content. NO link.",
-                "أنشئ رسالة تستهدف كادر تقنية المعلومات تحتوي على مرفق Word "
-                "(مثل: سياسة_أمن_المعلومات_2024.docx). النص يطلب تفعيل الماكرو. لا رابط."
-            ),
-        },
-        "hr_link": {
-            "clinical": (
-                "Generate an email that looks like an official hospital HR announcement about "
-                "mandatory clinical compliance training enrollment. "
-                "Contains suspicious link (http://...) — 'Click here to enroll'. Link MUST appear in body.",
-                "أنشئ رسالة تبدو كإعلان رسمي من الموارد البشرية عن تسجيل إلزامي "
-                "في تدريب الامتثال السريري. تحتوي على رابط مشبوه (http://...) — 'انقر هنا للتسجيل'. "
-                "يجب أن يظهر الرابط في النص."
-            ),
-            "admin": (
-                "Generate an email that looks like an official HR announcement about "
-                "new employee benefits enrollment deadline. "
-                "Contains suspicious link (http://...) — 'Click here to enroll'. Link MUST appear in body.",
-                "أنشئ رسالة تبدو كإعلان رسمي من الموارد البشرية عن موعد نهائي "
-                "للتسجيل في المزايا الجديدة للموظفين. تحتوي على رابط مشبوه (http://...) — 'انقر هنا للتسجيل'. "
-                "يجب أن يظهر الرابط في النص."
-            ),
-            "it": (
-                "Generate an email that looks like an official IT security policy update "
-                "requiring immediate acknowledgment via a link. "
-                "Contains suspicious link (http://...) — 'Click here to confirm'. Link MUST appear in body.",
-                "أنشئ رسالة تبدو كتحديث رسمي لسياسة أمن المعلومات يتطلب تأكيداً فورياً عبر رابط. "
-                "تحتوي على رابط مشبوه (http://...) — 'انقر هنا للتأكيد'. "
-                "يجب أن يظهر الرابط في النص."
-            ),
-        },
-        "exec": {
-            "clinical": (
-                "Generate an email impersonating the hospital medical director urgently requesting "
-                "a clinical staff member to share patient data or system access credentials immediately. "
-                "Pure social engineering — no link needed.",
-                "أنشئ رسالة تنتحل هوية المدير الطبي للمستشفى وتطلب بشكل عاجل "
-                "من أحد الكادر السريري مشاركة بيانات المرضى أو بيانات الوصول للأنظمة فوراً. "
-                "هندسة اجتماعية بحتة — لا رابط."
-            ),
-            "admin": (
-                "Generate an email impersonating the CEO/director urgently requesting "
-                "an admin manager to process an urgent financial transaction or share payroll data. "
-                "Pure social engineering — no link needed.",
-                "أنشئ رسالة تنتحل هوية المدير التنفيذي وتطلب بشكل عاجل "
-                "من المدير الإداري معالجة معاملة مالية عاجلة أو مشاركة بيانات الرواتب. "
-                "هندسة اجتماعية بحتة — لا رابط."
-            ),
-            "it": (
-                "Generate an email impersonating the CIO/IT director urgently requesting "
-                "an IT specialist to provide server access credentials or disable security settings. "
-                "Pure social engineering — no link needed.",
-                "أنشئ رسالة تنتحل هوية مدير تقنية المعلومات وتطلب بشكل عاجل "
-                "من متخصص تقنية المعلومات تقديم بيانات الوصول للخوادم أو تعطيل إعدادات الأمان. "
-                "هندسة اجتماعية بحتة — لا رابط."
-            ),
-        },
-    }
-    en_desc, ar_desc = descs[scenario_key].get(role_type, descs[scenario_key]["clinical"])
-    return ar_desc if is_ar else en_desc
-
-# =============================================================
-# LEARNING PHASE SCENARIOS (6 types)
-# -------------------------------------------------------------
-# Defines the 6 distinct phishing scenario types used in the
-# Learning Phase. Each scenario has:
-#   key            : internal identifier for role-specific desc
-#   en_type/ar_type: display name shown in the UI
-#   has_attachment : True if scenario involves a file attachment
-#   attachment_ext : file extension (.pdf, .xlsx, .docx, "")
-#   has_link       : True if scenario involves a suspicious URL
-# The scenarios are shuffled randomly each session via
-# get_shuffled_scenario_order() to prevent memorisation.
-# =============================================================
 PHISHING_SCENARIOS = [
     {"key":"link",    "en_type":"Credential Harvesting Link",              "ar_type":"رابط سرقة بيانات الدخول",             "has_attachment":False, "attachment_ext":"", "has_link":True},
     {"key":"pdf",     "en_type":"Malicious PDF Attachment",                "ar_type":"مرفق PDF خبيث",                        "has_attachment":True,  "attachment_ext":".pdf", "has_link":False},
@@ -430,11 +199,6 @@ PHISHING_SCENARIOS = [
 ]
 
 def get_shuffled_scenario_order():
-    # Returns a shuffled list of scenario indices (0-5).
-    # Shuffled once per session and stored in session_state,
-    # so the order stays consistent within a session but
-    # changes between sessions. Prevents users from predicting
-    # which scenario type comes next.
     if "scenario_order" not in st.session_state:
         order = list(range(len(PHISHING_SCENARIOS)))
         random.shuffle(order)
@@ -442,15 +206,8 @@ def get_shuffled_scenario_order():
     return st.session_state["scenario_order"]
 
 # =============================================================
-# AI PROMPT BUILDER - LEARNING PHASE
-# -------------------------------------------------------------
-# Constructs the prompt sent to the Groq API for each phishing
-# example. The prompt is role-aware and language-aware:
-#   - Uses the shuffled scenario order for variety
-#   - Injects role-specific context (clinical/admin/IT)
-#   - Sets strict language rules (Arabic OR English only)
-#   - Specifies exactly what the JSON response must contain
-# Returns a string prompt ready to send to the LLM.
+# FIX 1: build_prompt — upgraded to llama-3.3-70b-versatile
+# and enhanced difficulty rules with more detail
 # =============================================================
 def build_prompt(role, index, language):
     is_ar      = (language == "Arabic")
@@ -461,7 +218,6 @@ def build_prompt(role, index, language):
     import time
     session_seed = abs(hash(str(seed) + str(index) + str(time.time()))) % 99999
 
-    # ── Role guidance ────────────────────────────────────────────
     role_guidance = {
         "clinical": (
             "Doctors, nurses, pharmacists, lab technicians, radiologists in a Saudi hospital.",
@@ -495,62 +251,70 @@ def build_prompt(role, index, language):
     }
     r_desc, r_ctx, r_guidance = role_guidance.get(role_type, role_guidance["other"])
 
-    # ── Difficulty ───────────────────────────────────────────────
+    # FIX 3: Enhanced difficulty rules — more detailed for both languages
     if is_ar:
         diff_rules = {
             "easy": (
-                "مستوى مبتدئ — العلامات يجب أن تكون واضحة جداً:\n"
-                "- نطاق مزيف واضح تماماً (مثل hosp1tal-updates.xyz أو hospital.totally-fake.net)\n"
-                "- خطأين إملائيين واضحين في نص الرسالة\n"
-                "- إلحاح مبالغ فيه بحروف كبيرة (تصرف الآن! موعد نهائي اليوم!)\n"
-                "- تحية عامة فقط: 'عزيزي الموظف' — ممنوع استخدام الاسم\n"
-                "- طلب صريح ومشبوه (شارك كلمة المرور، أدخل بياناتك كاملة)"
+                "مستوى مبتدئ — العلامات يجب أن تكون واضحة جداً ولا تخطئها:\n"
+                "- نطاق مزيف واضح تماماً (مثل hosp1tal-updates.xyz أو hospital.totally-fake.net أو secur3-login.com)\n"
+                "- خطأين إملائيين واضحين على الأقل في نص الرسالة (مثل: 'تسجيل الدخوول' أو 'عزيزي الموظفف')\n"
+                "- إلحاح مبالغ فيه بعبارات تحذيرية كبيرة (تصرف الآن! سيتم إغلاق حسابك خلال ساعة! موعد نهائي اليوم!)\n"
+                "- تحية عامة فقط: 'عزيزي الموظف' أو 'عزيزي المستخدم' — ممنوع استخدام الاسم أو المسمى الوظيفي\n"
+                "- طلب صريح ومشبوه جداً (شارك كلمة المرور، أدخل بياناتك الكاملة، أرسل رقم الهوية)\n"
+                "- عنوان المرسل واضح الزيف (مثل: noreply@hospital-secure.xyz)"
             ),
             "medium": (
-                "مستوى متوسط — صعوبة معتدلة:\n"
-                "- نطاق مشبوه نسبياً لكن ليس واضح الزيف (مثل hospital-hr-portal.net)\n"
-                "- أسلوب مهني مع علامة تحذيرية واحدة في الصياغة\n"
-                "- إلحاح معتدل ('يرجى الرد بنهاية الأسبوع')\n"
-                "- تحية شبه شخصية (اللقب مع اسم خاطئ أحياناً)"
+                "مستوى متوسط — صعوبة معتدلة، بعض العلامات واضحة وبعضها يحتاج تمعّناً:\n"
+                "- نطاق مشبوه نسبياً لكن ليس واضح الزيف تماماً (مثل hospital-hr-portal.net أو moh-notifications.com)\n"
+                "- أسلوب شبه مهني مع علامة تحذيرية واحدة أو اثنتين في الصياغة\n"
+                "- خطأ إملائي واحد بسيط أو جملة غير طبيعية في السياق\n"
+                "- إلحاح معتدل ('يرجى الرد بنهاية الأسبوع' أو 'يجب التحديث قبل يوم الاثنين')\n"
+                "- تحية شبه شخصية (اللقب الوظيفي صح لكن الاسم أحياناً خاطئ أو عام)\n"
+                "- الطلب غير عادي لكن ليس مستحيلاً في بيئة العمل"
             ),
             "hard": (
-                "مستوى متقدم — العلامات خفية جداً:\n"
-                "- نطاق يشبه الحقيقي مع تغيير بسيط جداً (مثل hosp1tal.org أو hospital-sa.net)\n"
-                "- لغة عربية فصحى مهنية سليمة تماماً، صفر أخطاء\n"
-                "- إلحاح خفيف ومهني ('نرجو الاطلاع قبل نهاية يوم العمل')\n"
-                "- تحية بالاسم الكامل والمسمى الوظيفي\n"
-                "- علامة تحذيرية واحدة فقط وخفية — كل شيء آخر يبدو حقيقياً تماماً"
+                "مستوى متقدم — العلامات خفية جداً، الرسالة تبدو حقيقية تقريباً:\n"
+                "- نطاق يشبه الحقيقي مع تغيير بسيط جداً لا يُلاحَظ بسهولة (مثل hosp1tal.org أو hospital-sa.net أو moh.gov-sa.com)\n"
+                "- لغة عربية فصحى مهنية سليمة تماماً، صفر أخطاء إملائية أو نحوية\n"
+                "- إلحاح خفيف ومهني جداً ('نرجو الاطلاع قبل نهاية يوم العمل' أو 'للحفاظ على أمان حسابك')\n"
+                "- تحية بالاسم الكامل والمسمى الوظيفي الدقيق\n"
+                "- علامة تحذيرية واحدة فقط وخفية للغاية — كل شيء آخر يبدو حقيقياً تماماً\n"
+                "- المحتوى ذو صلة مباشرة بعمل المستلم ويوحي بمعرفة داخلية"
             ),
         }
     else:
         diff_rules = {
             "easy": (
-                "BEGINNER difficulty — signs must be VERY obvious:\n"
-                "- Clearly fake domain (e.g. hosp1tal-updates.xyz, hospital.totally-fake.net)\n"
-                "- 2 obvious spelling/grammar mistakes in the body\n"
-                "- Aggressive ALL-CAPS urgency (ACT NOW! DEADLINE TODAY!)\n"
-                "- Generic greeting only: 'Dear Staff' — never use recipient name\n"
-                "- Obviously suspicious request (share password, enter full credentials)"
+                "BEGINNER difficulty — red flags must be VERY obvious and easy to spot:\n"
+                "- Clearly fake domain (e.g. hosp1tal-updates.xyz, hospital.totally-fake.net, secur3-login.com)\n"
+                "- At least 2 obvious spelling/grammar mistakes in the body text\n"
+                "- Aggressive ALL-CAPS urgency with alarming language (ACT NOW! YOUR ACCOUNT WILL BE CLOSED! DEADLINE TODAY!)\n"
+                "- Generic greeting only: 'Dear Staff' or 'Dear User' — never use recipient's name or job title\n"
+                "- Blatantly suspicious request (share your password, enter full credentials, send your ID number)\n"
+                "- Sender address obviously fake (e.g. noreply@hospital-secure.xyz)"
             ),
             "medium": (
-                "INTERMEDIATE difficulty — moderate:\n"
-                "- Slightly suspicious domain (e.g. hospital-hr-portal.net)\n"
-                "- Mostly professional with 1 red flag in wording\n"
-                "- Moderate urgency ('Please respond by end of week')\n"
-                "- Semi-personal greeting (title with occasionally wrong name)"
+                "INTERMEDIATE difficulty — some flags obvious, some require careful reading:\n"
+                "- Slightly suspicious domain that looks almost real (e.g. hospital-hr-portal.net, moh-notifications.com)\n"
+                "- Mostly professional tone with 1-2 red flags in wording\n"
+                "- One minor spelling error or awkward sentence that feels slightly off\n"
+                "- Moderate urgency with a deadline ('Please respond by end of week' or 'Update required before Monday')\n"
+                "- Semi-personal greeting — correct job title but name is generic or slightly wrong\n"
+                "- Request is unusual but not impossible in a workplace context"
             ),
             "hard": (
-                "ADVANCED difficulty — signs must be very SUBTLE:\n"
-                "- Nearly real domain with tiny change only (e.g. hosp1tal.org or hospital-sa.net)\n"
-                "- Perfect professional language, zero errors\n"
-                "- Subtle polite urgency ('Kindly review before end of business day')\n"
-                "- Full name and job title in greeting\n"
-                "- Only ONE subtle red flag — everything else looks completely legitimate"
+                "ADVANCED difficulty — red flags extremely subtle, email looks almost completely legitimate:\n"
+                "- Nearly real domain with only one tiny character change (e.g. hosp1tal.org, hospital-sa.net, moh.gov-sa.com)\n"
+                "- Perfect professional English, zero spelling or grammar errors\n"
+                "- Subtle, polite urgency only ('Kindly review before end of business day' or 'To keep your account secure')\n"
+                "- Personalised greeting with full name and exact job title\n"
+                "- Only ONE subtle red flag — everything else looks completely legitimate\n"
+                "- Content directly relevant to recipient's work, implying insider knowledge"
             ),
         }
+
     diff_rule = diff_rules.get(difficulty, diff_rules["medium"])
 
-    # ── Language ─────────────────────────────────────────────────
     if is_ar:
         lang_rule = (
             "اللغة: عربية فصحى فقط في كل النصوص (subject/body/indicators/why_risky/learning_tip).\n"
@@ -599,24 +363,126 @@ Each of the 6 examples must be a COMPLETELY DIFFERENT attack type and format.
 {{"email_type":"attack type name","from":"{from_ex}","to":"employee@hospital.org","subject":"subject line","attachment":"filename or empty","body":"{body_ex}","suspicious_text":"most suspicious phrase","suspicious_link":"url or empty","indicators":[{{"number":1,"title":"{ind_t_ex}","description":"{ind_d_ex}"}},{{"number":2,"title":"{ind_t_ex}","description":"{ind_d_ex}"}},{{"number":3,"title":"{ind_t_ex}","description":"{ind_d_ex}"}}],"why_risky":"why dangerous for this role","learning_tip":"practical tip for this role"}}"""
 
 # =============================================================
-# API COMMUNICATION LAYER
-# -------------------------------------------------------------
-# These functions handle all communication with the Groq API.
-# Groq hosts the LLaMA 3.3-70b model and provides fast inference.
-# API key is read from environment variable GROQ_API_KEY.
-# (Can be swapped to OpenAI or Anthropic Claude by changing
-#  the endpoint URL and response parsing in call_groq().)
+# FIX 2 + FIX 3: build_assess_prompt — tokens raised to 1200,
+# difficulty rules expanded to match build_prompt detail level
 # =============================================================
+def build_assess_prompt(role, index, is_phishing, language):
+    is_ar      = (language == "Arabic")
+    difficulty = st.session_state.get("difficulty", "medium")
+    role_info  = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
+    role_desc, role_ctx, role_type = role_info
+    seed = st.session_state.get("cache_version", 13)
+    import time
+    session_seed = abs(hash(str(seed) + str(index) + str(is_phishing) + str(time.time()))) % 99999
+
+    role_guidance = {
+        "clinical": (
+            "a nurse, doctor, pharmacist, or lab technician in a Saudi hospital",
+            "EMR, patient records, lab results, pharmacy, clinical schedules, MOH alerts, medical devices, surgery"
+        ),
+        "admin": (
+            "a medical secretary, receptionist, patient records clerk, insurance coordinator, or billing specialist in Saudi healthcare",
+            "patient appointments, medical records, health insurance, hospital billing, medical procurement, MOH compliance"
+        ),
+        "it": (
+            "an IT specialist, system administrator, or cybersecurity officer in a Saudi hospital",
+            "hospital network, VPN, servers, EMR system, cloud backup, SSL, firewall, software licenses, IT helpdesk"
+        ),
+        "other": (
+            "a general hospital employee in Saudi Arabia",
+            "any hospital department"
+        ),
+    }
+    r_desc, r_ctx = role_guidance.get(role_type, role_guidance["other"])
+
+    # FIX 3: Expanded difficulty rules for assessment — same detail as learning
+    if is_ar:
+        diff_rules = {
+            "easy": (
+                "مستوى مبتدئ — العلامات يجب أن تكون واضحة جداً:\n"
+                "- نطاق مزيف واضح (مثل hosp1tal-updates.xyz أو hospital.totally-fake.net)\n"
+                "- خطأين إملائيين واضحين في نص الرسالة\n"
+                "- إلحاح مبالغ فيه بعبارات تحذيرية كبيرة\n"
+                "- تحية عامة فقط: 'عزيزي الموظف' — ممنوع الاسم\n"
+                "- طلب صريح ومشبوه جداً (شارك كلمة المرور، أدخل بياناتك)"
+            ),
+            "medium": (
+                "مستوى متوسط — صعوبة معتدلة:\n"
+                "- نطاق مشبوه نسبياً (مثل hospital-hr-portal.net)\n"
+                "- أسلوب شبه مهني مع علامة أو اثنتين\n"
+                "- خطأ إملائي واحد أو جملة غير طبيعية\n"
+                "- إلحاح معتدل ('يرجى الرد بنهاية الأسبوع')\n"
+                "- تحية شبه شخصية (اللقب صح، الاسم أحياناً خاطئ)"
+            ),
+            "hard": (
+                "مستوى متقدم — العلامات خفية جداً:\n"
+                "- نطاق يشبه الحقيقي مع تغيير بسيط جداً (مثل hosp1tal.org أو hospital-sa.net)\n"
+                "- لغة عربية فصحى مهنية سليمة تماماً، صفر أخطاء\n"
+                "- إلحاح خفيف ومهني ('نرجو الاطلاع قبل نهاية يوم العمل')\n"
+                "- تحية بالاسم الكامل والمسمى الوظيفي الدقيق\n"
+                "- علامة تحذيرية واحدة فقط وخفية — كل شيء آخر يبدو حقيقياً تماماً"
+            ),
+        }
+        lang_rule = "عربية فصحى فقط. الروابط والبريد الإلكتروني لاتينية. حقل 'to' بريد فقط."
+        task_p = f"ولّد رسالة تصيد إلكتروني واقعية تستهدف {r_desc}. اختر نوع الهجوم بحرية كاملة من السياق: {r_ctx}. كن مبدعاً ومختلفاً."
+        task_l = f"ولّد بريد إلكتروني شرعي وطبيعي من بيئة عمل {r_desc}. استخدم نطاق رسمي (@hospital.org أو @moh.gov.sa). لا علامات تصيد إطلاقاً."
+        expl   = "اشرح بوضوح لماذا هذا البريد " + ("تصيد إلكتروني وما هي العلامات التحذيرية التي تكشفه" if is_phishing else "شرعي وآمن وما الذي يجعله موثوقاً")
+        from_ex, subj_ex, body_ex = "المرسل <email@domain.com>", "موضوع الرسالة", "نص الرسالة بالعربية"
+    else:
+        diff_rules = {
+            "easy": (
+                "BEGINNER difficulty — red flags VERY obvious and easy to spot:\n"
+                "- Clearly fake domain (e.g. hosp1tal-updates.xyz, hospital.totally-fake.net)\n"
+                "- At least 2 obvious spelling/grammar mistakes in the body\n"
+                "- Aggressive ALL-CAPS urgency (ACT NOW! DEADLINE TODAY! ACCOUNT WILL BE CLOSED!)\n"
+                "- Generic greeting only: 'Dear Staff' or 'Dear User' — never use recipient name\n"
+                "- Blatantly suspicious request (share password, enter full credentials)"
+            ),
+            "medium": (
+                "INTERMEDIATE difficulty — some flags obvious, some need careful reading:\n"
+                "- Slightly suspicious domain (e.g. hospital-hr-portal.net, moh-notifications.com)\n"
+                "- Mostly professional tone with 1-2 red flags in wording\n"
+                "- One minor spelling error or awkward sentence\n"
+                "- Moderate urgency with a deadline ('Please respond by end of week')\n"
+                "- Semi-personal greeting — correct title but name slightly wrong or generic"
+            ),
+            "hard": (
+                "ADVANCED difficulty — red flags extremely subtle, email looks almost completely legitimate:\n"
+                "- Nearly real domain with only one tiny character change (e.g. hosp1tal.org, hospital-sa.net)\n"
+                "- Perfect professional English, zero spelling or grammar errors\n"
+                "- Subtle polite urgency only ('Kindly review before end of business day')\n"
+                "- Personalised greeting with full name and exact job title\n"
+                "- Only ONE subtle red flag — everything else looks completely legitimate"
+            ),
+        }
+        lang_rule = "English only throughout. Email addresses and URLs stay Latin."
+        task_p = f"Generate a realistic phishing email targeting {r_desc}. Freely choose any attack type from this context: {r_ctx}. Be creative and varied."
+        task_l = f"Generate a realistic legitimate workplace email for {r_desc}. Use official domain (@hospital.org or @moh.gov.sa). Zero suspicious elements — must look completely normal."
+        expl   = f"Clearly explain why this email is {'phishing — identify all the red flags that give it away' if is_phishing else 'legitimate and safe — explain what makes it trustworthy'}"
+        from_ex, subj_ex, body_ex = "Sender Name <email@domain.com>", "subject line", "email body in English"
+
+    diff_rule = diff_rules.get(difficulty, diff_rules["medium"])
+    task = task_p if is_phishing else task_l
+
+    return f"""Phishing awareness assessment email for Saudi healthcare. Seed:{session_seed}
+
+TARGET: {r_desc}
+CONTEXT: {r_ctx}
+
+TASK: {task}
+
+DIFFICULTY: {diff_rule}
+
+LANGUAGE: {lang_rule}
+
+FORMAT: body=plain text only, \\n for line breaks, no HTML. "to"=email address only.
+{"If phishing uses a link: put URL in suspicious_link AND in body. If attachment: filename in attachment field." if is_phishing else 'suspicious_link:"", attachment:""'}
+{"If legitimate: use real official domain (@hospital.org or @moh.gov.sa), no suspicious links, no urgent credential requests.' " if not is_phishing else ""}
+
+RETURN ONLY VALID JSON:
+{{"is_phishing":{"true" if is_phishing else "false"},"from":"{from_ex}","to":"employee@hospital.org","subject":"{subj_ex}","attachment":"","body":"{body_ex}","suspicious_link":"","explanation":"{expl}"}}"""
+
 def call_ai(prompt, max_tokens=1600):
-    # =============================================================
-    # UNIFIED AI CALLER — supports 4 APIs for research comparison
-    # Selected via st.session_state["ai_provider"]:
-    #   "groq"      → Groq (LLaMA 3.3-70b)   — default / v3 baseline
-    #   "openai"    → ChatGPT (GPT-4o)        — most used globally
-    #   "anthropic" → Claude (claude-3-5-sonnet) — best writing quality
-    #   "gemini"    → Gemini (gemini-1.5-pro) — fastest growing
-    # All providers use temperature=0.85 for variety.
-    # =============================================================
     provider = st.session_state.get("ai_provider", "groq")
 
     def get_secret(key):
@@ -625,7 +491,7 @@ def call_ai(prompt, max_tokens=1600):
         except Exception:
             return os.environ.get(key, "")
 
-    # ── Groq (LLaMA 3.3-70b) ──────────────────────────────────
+    # FIX 1: Changed model from llama-3.1-8b-instant to llama-3.3-70b-versatile
     if provider == "groq":
         resp = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -634,7 +500,7 @@ def call_ai(prompt, max_tokens=1600):
                 "Authorization": f"Bearer {get_secret('GROQ_API_KEY')}"
             },
             json={
-                "model":       "llama-3.1-8b-instant",
+                "model":       "llama-3.3-70b-versatile",  # ← FIX 1: upgraded from 8b to 70b
                 "max_tokens":  max_tokens,
                 "temperature": 0.85,
                 "messages":    [{"role": "user", "content": prompt}]
@@ -642,10 +508,8 @@ def call_ai(prompt, max_tokens=1600):
             timeout=45
         )
         data = resp.json()
-        # normalise to {"choices":[{"message":{"content":...}}]}
         return data
 
-    # ── OpenAI (GPT-4o) ────────────────────────────────────────
     elif provider == "openai":
         resp = requests.post(
             "https://api.openai.com/v1/chat/completions",
@@ -663,7 +527,6 @@ def call_ai(prompt, max_tokens=1600):
         )
         return resp.json()
 
-    # ── Anthropic (Claude 3.5 Sonnet) ──────────────────────────
     elif provider == "anthropic":
         resp = requests.post(
             "https://api.anthropic.com/v1/messages",
@@ -680,13 +543,11 @@ def call_ai(prompt, max_tokens=1600):
             timeout=60
         )
         raw = resp.json()
-        # Convert Anthropic format → OpenAI-compatible format
         if "content" in raw and len(raw["content"]) > 0:
             text = raw["content"][0].get("text", "")
             return {"choices": [{"message": {"content": text}}]}
         return {"error": raw}
 
-    # ── Google Gemini (gemini-1.5-pro) ─────────────────────────
     elif provider == "gemini":
         api_key = get_secret("GEMINI_API_KEY")
         resp = requests.post(
@@ -702,7 +563,6 @@ def call_ai(prompt, max_tokens=1600):
             timeout=60
         )
         raw = resp.json()
-        # Convert Gemini format → OpenAI-compatible format
         try:
             text = raw["candidates"][0]["content"]["parts"][0]["text"]
             return {"choices": [{"message": {"content": text}}]}
@@ -712,32 +572,25 @@ def call_ai(prompt, max_tokens=1600):
     else:
         return {"error": f"Unknown provider: {provider}"}
 
-# Keep old name as alias for backwards compatibility
 def call_groq(prompt, max_tokens=1600):
     return call_ai(prompt, max_tokens)
 
 def parse_json_response(raw):
-    # Step 1: strip markdown fences
     if "```" in raw:
         parts = raw.split("```")
         raw = parts[1] if len(parts) > 1 else parts[0]
         if raw.startswith("json"):
             raw = raw[4:]
     raw = raw.strip()
-    # Step 2: strip control chars
     raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', raw)
-    # Step 3: fix real newlines inside strings
     raw = fix_json_newlines(raw)
-    # Step 4: try direct parse
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
         pass
-    # Step 5: aggressive fix — extract first {...} block and sanitize
     match = re.search(r'\{.*\}', raw, re.DOTALL)
     if match:
         candidate = match.group(0)
-        # Replace unescaped single quotes inside string values with unicode equiv
         candidate = re.sub(r"(?<=\w)'(?=\w)", "\u2019", candidate)
         try:
             return json.loads(candidate)
@@ -758,12 +611,10 @@ def clean_result(result, is_arabic):
                 if is_arabic:
                     ind[k] = remove_foreign_latin_words(ind[k])
     result["from"] = clean_email_field(result.get("from",""))
-    # ALWAYS extract clean email only for "to" field
     result["to"] = extract_to_email(result.get("to",""))
     if result.get("suspicious_link"):
         sl = result["suspicious_link"]
         sl = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]','',sl).strip()
-        # Remove any Arabic text that might have leaked into the link
         sl = re.sub(r'[\u0600-\u06ff\s]','',sl)
         result["suspicious_link"] = sl
     return result
@@ -779,35 +630,35 @@ def generate_email(role, index, language):
         result = parse_json_response(raw)
         result = clean_result(result, language=="Arabic")
         result["to"] = get_recipient(role, index, language)
-
-        # If AI generated a link, make sure it appears in the body too
         if result.get("suspicious_link","").strip():
             if result["suspicious_link"] not in result.get("body",""):
                 result["body"] = result.get("body","") + f'\n{result["suspicious_link"]}'
-
         return result
     except json.JSONDecodeError as e:
         return {"error": f"JSON parse error: {e}"}
     except Exception as e:
         return {"error": str(e)}
 
-# =============================================================
-# EMAIL WINDOW RENDERER
-# -------------------------------------------------------------
-# Shared renderer used by BOTH the Learning Phase and Assessment.
-# Renders an HTML email client window (dark theme, macOS style).
-# Parameters:
-#   email       : dict with keys: from, to, subject, body,
-#                 attachment, suspicious_text, suspicious_link
-#   is_arabic   : bool - controls RTL/LTR layout direction
-#   show_badges : True in Learning Phase only - adds numbered
-#                 red circles on suspicious elements to guide
-#                 the learner's attention.
-# Layout direction:
-#   Arabic  : direction=rtl, text-align=right
-#   English : direction=ltr, text-align=left
-#   "To" field: always LTR (email addresses are Latin)
-# =============================================================
+def generate_assess_email(role, index, is_phishing, language):
+    # FIX 2: max_tokens raised from 800 to 1200
+    for attempt in range(3):
+        try:
+            data = call_groq(build_assess_prompt(role, index, is_phishing, language), max_tokens=1200)
+            if "error" in data:
+                return {"error": data["error"].get("message", str(data["error"]))}
+            result = parse_json_response(data["choices"][0]["message"]["content"].strip())
+            result = clean_result(result, language=="Arabic")
+            result["to"] = get_recipient(st.session_state.get("role","Clinical"), index, language)
+            if result.get("suspicious_link","").strip():
+                if result["suspicious_link"] not in result.get("body",""):
+                    result["body"] = result.get("body","") + f'\n{result["suspicious_link"]}'
+            return result
+        except json.JSONDecodeError:
+            if attempt == 2:
+                return {"error": "Failed to parse. Please try again."}
+        except Exception as e:
+            return {"error": str(e)}
+
 def render_email_window(email, is_arabic, show_badges=False):
     bd = 'rtl' if is_arabic else 'ltr'
     ta = 'right' if is_arabic else 'left'
@@ -817,14 +668,10 @@ def render_email_window(email, is_arabic, show_badges=False):
     suspicious_text = re.sub(r'<[^>]+>','', email.get("suspicious_text",""))
     suspicious_link = re.sub(r'<[^>]+>','', email.get("suspicious_link","")).strip()
 
-    # ── Clean body: remove "suspicious_link:" prefix if AI included it ──
-    # The AI sometimes writes "suspicious_link: https://..." in the body text
     body_raw = re.sub(r'suspicious_link\s*:\s*', '', body_raw, flags=re.IGNORECASE)
     body_raw = re.sub(r'suspicious_text\s*:\s*', '', body_raw, flags=re.IGNORECASE)
 
-    # ── Ensure suspicious_link appears in body for highlighting ─────────
     if suspicious_link and suspicious_link not in body_raw:
-        # Check if a variant exists without protocol
         link_bare = re.sub(r'^https?://', '', suspicious_link)
         if link_bare not in body_raw:
             body_raw = body_raw.rstrip() + f'\n\n{suspicious_link}'
@@ -861,7 +708,6 @@ def render_email_window(email, is_arabic, show_badges=False):
                     f'padding:.2rem .5rem;background:rgba(239,68,68,.08);color:#60A5FA;'
                     f'text-decoration:underline;">{make_badge(b)}{safe_l}</span>', 1)
             else:
-                # Always show the link even if not found in body
                 b = next_badge()
                 body_html += (f'<br><br><span style="border:2px solid rgba(239,68,68,.6);'
                               f'border-radius:6px;padding:.2rem .5rem;background:rgba(239,68,68,.08);'
@@ -871,7 +717,6 @@ def render_email_window(email, is_arabic, show_badges=False):
     body_html = body_html.replace("\n","<br>")
 
     from_val = html_lib.escape(email.get("from",""))
-    # "to" is already clean email only from extract_to_email
     to_val   = html_lib.escape(email.get("to","employee@hospital.org"))
     subj_val = html_lib.escape(email.get("subject",""))
     att_val  = html_lib.escape(email.get("attachment",""))
@@ -929,18 +774,6 @@ def render_email_window(email, is_arabic, show_badges=False):
 </div>""", unsafe_allow_html=True)
 
 
-# =============================================================
-# PAGE 1: HOME
-# -------------------------------------------------------------
-# Entry point of the application. Shows:
-#   - Hero section with app title and shield icon
-#   - 4 feature cards explaining the tool
-#   - Language selector (English / Arabic)
-#   - Role selector (Clinical / Admin / IT / Other)
-#   - "Start Personalised Training" button
-# On start: clears old session data, shuffles scenario order,
-# and navigates to the Learning Phase.
-# =============================================================
 def page_home():
     is_arabic      = st.session_state["language"] == "Arabic"
     dir_attr       = 'rtl' if is_arabic else 'ltr'
@@ -992,10 +825,6 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
     SHFOOT     = """<svg width="42" height="48" viewBox="0 0 42 48" fill="none"><path d="M21 3L39 10V24C39 34 31 43 21 46C11 43 3 34 3 24V10L21 3Z" stroke="#1EA7FF" stroke-width="2.5" fill="none"/></svg>"""
     ECG_SVG    = """<svg width="80" height="28" viewBox="0 0 80 28" fill="none"><polyline points="0,14 15,14 20,4 25,24 30,4 35,20 40,14 80,14" stroke="#1EA7FF" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>"""
 
-    # ── Navbar ──────────────────────────────────────────────────
-    # Pure HTML navbar — no st.columns() at all.
-    # Buttons are HTML <button> elements. JS sends a click to the
-    # hidden Streamlit buttons below so session_state updates fire.
     nav_login    = t("Login","تسجيل الدخول")
     nav_register = t("Register","إنشاء حساب")
     nav_brand    = t("AI Phishing Awareness","التوعية بالتصيد الإلكتروني")
@@ -1004,7 +833,6 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
     flex_dir     = "row-reverse" if is_arabic else "row"
 
     if user_name:
-        # ── Logged-in: pure HTML, no buttons needed
         st.markdown(f"""
 <div style="background:rgba(11,46,104,0.55);border:1px solid rgba(37,99,235,.4);
      border-radius:14px;padding:8px 20px;margin-bottom:1.2rem;
@@ -1025,26 +853,14 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
       {html_lib.escape(user_name)}</span>
   </div>
 </div>""", unsafe_allow_html=True)
-
     else:
-        # ── Guest: HTML navbar only — navigation via ?nav= query param
         st.markdown(f"""
 <style>
-.nb-btn {{
-    height:34px; padding:0 16px; border-radius:9px; font-size:12px;
-    font-weight:700; cursor:pointer; display:inline-flex; align-items:center;
-    white-space:nowrap; text-decoration:none;
-}}
-.nb-btn-ghost {{
-    background:rgba(15,23,42,.88); color:#EAF4FF !important;
-    border:1px solid rgba(37,99,235,.5);
-}}
-.nb-btn-ghost:hover {{ background:rgba(37,99,235,.25); border-color:#1EA7FF; color:#fff !important; }}
-.nb-btn-solid {{
-    background:linear-gradient(90deg,#0B4FA8,#0284C7);
-    color:white !important; border:none;
-}}
-.nb-btn-solid:hover {{ background:linear-gradient(90deg,#1560C0,#0396E0); }}
+.nb-btn {{height:34px;padding:0 16px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;white-space:nowrap;text-decoration:none;}}
+.nb-btn-ghost {{background:rgba(15,23,42,.88);color:#EAF4FF !important;border:1px solid rgba(37,99,235,.5);}}
+.nb-btn-ghost:hover {{background:rgba(37,99,235,.25);border-color:#1EA7FF;color:#fff !important;}}
+.nb-btn-solid {{background:linear-gradient(90deg,#0B4FA8,#0284C7);color:white !important;border:none;}}
+.nb-btn-solid:hover {{background:linear-gradient(90deg,#1560C0,#0396E0);}}
 </style>
 <div style="background:rgba(11,46,104,0.55);border:1px solid rgba(37,99,235,.4);
      border-radius:14px;padding:8px 20px;margin-bottom:1.2rem;
@@ -1055,12 +871,11 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
     <span style="font-size:15px;font-weight:800;color:#F8FAFC;white-space:nowrap;">{nav_brand}</span>
   </div>
   <div style="display:flex;gap:8px;align-items:center;">
-    <a href="?nav=login&lang={st.session_state.get('language','English')}"  class="nb-btn nb-btn-ghost">{nav_login}</a>
+    <a href="?nav=login&lang={st.session_state.get('language','English')}" class="nb-btn nb-btn-ghost">{nav_login}</a>
     <a href="?nav=register&lang={st.session_state.get('language','English')}" class="nb-btn nb-btn-solid">{nav_register}</a>
   </div>
 </div>""", unsafe_allow_html=True)
 
-    # ── Hero ────────────────────────────────────────────────────
     title   = t("AI Phishing Awareness","التوعية بالتصيد الإلكتروني بالذكاء الاصطناعي")
     tagline = t("Smart, Personalised, Protective.","ذكي، مخصص، وقائي")
     desc    = t("AI-powered training and assessment to help healthcare employees recognise and avoid phishing threats.",
@@ -1080,7 +895,6 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
     gi = co+sh if is_arabic else sh+co
     st.markdown(f'<div class="hero-card"><div class="hero-grid">{gi}</div></div>', unsafe_allow_html=True)
 
-    # ── Feature cards ───────────────────────────────────────────
     cards = [
         (BRAIN_SVG, t("AI-Powered Learning","تعلم بالذكاء الاصطناعي"), t("Personalised content adapted to your role.","محتوى تعليمي مخصص حسب دورك الوظيفي")),
         (TARGET_SVG,t("Smart Assessment","تقييم ذكي"),                 t("Short, focused assessments to test your awareness.","تقييمات قصيرة ومركزة لاختبار وعيك")),
@@ -1089,14 +903,12 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
     ]
     st.markdown('<div class="features-grid">'+"".join(f'<div class="feature-card"><div class="feature-icon">{i}</div><div class="feature-title">{tt}</div><div class="feature-text">{tx}</div></div>' for i,tt,tx in cards)+'</div>', unsafe_allow_html=True)
 
-    # ── Form + Side panel layout ─────────────────────────────────
     form_col, panel_col = st.columns([3, 1], gap="large")
 
     with form_col:
         form_title_txt = t("Let's personalise your experience","لنخصص تجربتك")
         st.markdown(f'<div class="form-section"><div class="form-title">👤 {form_title_txt}</div></div>', unsafe_allow_html=True)
 
-        # Step labels
         def step_label(n, txt):
             return f'''<div style="font-size:.85rem;color:#94A3B8;margin-bottom:.5rem;
                         display:flex;align-items:center;gap:6px;direction:{dir_attr};">
@@ -1107,35 +919,14 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
               {txt}
             </div>'''
 
-        # Step 1 — Language (required)
-        lang_ok   = st.session_state.get("language","") != ""
-        diff_ok   = st.session_state.get("difficulty","") != ""
-        req_badge = f'<span style="color:#EF4444;font-size:.75rem;margin-right:4px;">*</span>'
-
         st.markdown(step_label("1", t("Select your preferred language","اختر اللغة المفضلة")), unsafe_allow_html=True)
         cur_lang  = st.session_state.get("language","")
-        # Inject CSS to highlight selected language button
         en_cls = "lang-btn-sel" if cur_lang == "English" else "lang-btn"
         ar_cls = "lang-btn-sel" if cur_lang == "Arabic"  else "lang-btn"
         st.markdown(f"""<style>
-.lang-btn button {{
-    background: rgba(15,23,42,.78) !important;
-    border: 1px solid rgba(37,99,235,.55) !important;
-    color: #EAF4FF !important;
-}}
-.lang-btn-sel button {{
-    background: linear-gradient(90deg,#0B4FA8,#0284C7) !important;
-    border: 2px solid #1EA7FF !important;
-    color: white !important;
-    box-shadow: 0 0 14px rgba(30,167,255,.35) !important;
-}}
-.lang-btn-sel button:hover,
-.lang-btn-sel button:focus,
-.lang-btn-sel button:active {{
-    background: linear-gradient(90deg,#0B4FA8,#0284C7) !important;
-    border: 2px solid #1EA7FF !important;
-    color: white !important;
-}}
+.lang-btn button {{background:rgba(15,23,42,.78) !important;border:1px solid rgba(37,99,235,.55) !important;color:#EAF4FF !important;}}
+.lang-btn-sel button {{background:linear-gradient(90deg,#0B4FA8,#0284C7) !important;border:2px solid #1EA7FF !important;color:white !important;box-shadow:0 0 14px rgba(30,167,255,.35) !important;}}
+.lang-btn-sel button:hover,.lang-btn-sel button:focus,.lang-btn-sel button:active {{background:linear-gradient(90deg,#0B4FA8,#0284C7) !important;border:2px solid #1EA7FF !important;color:white !important;}}
 </style>""", unsafe_allow_html=True)
         col1,col2 = st.columns(2)
         with col1:
@@ -1156,7 +947,6 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
         st.markdown(step_label("3", t("Select difficulty level","اختر مستوى الصعوبة")), unsafe_allow_html=True)
 
     with panel_col:
-        # What to expect side panel
         ph_label  = t("Learning phase","مرحلة التعلم")
         as_label  = t("Assessment","الاختبار")
         rep_label = t("Performance report","تقرير الأداء")
@@ -1169,22 +959,12 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
         small_target = TARGET_SVG.replace('width="52"','width="18"').replace('height="52"','height="18"')
         small_chart  = CHART_SVG.replace('width="52"','width="18"').replace('height="52"','height="18"')
         st.markdown(f"""
-<div style="background:rgba(8,47,73,.2);border:1px solid rgba(37,99,235,.25);
-            border-radius:14px;padding:1.2rem 1rem;margin-top:1rem;direction:{dir_attr};">
+<div style="background:rgba(8,47,73,.2);border:1px solid rgba(37,99,235,.25);border-radius:14px;padding:1.2rem 1rem;margin-top:1rem;direction:{dir_attr};">
   <div style="font-size:.75rem;font-weight:800;color:#7DD3FC;letter-spacing:.06em;margin-bottom:14px;">{exp_title}</div>
   <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:16px;">
-    <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;
-                background:rgba(15,23,42,.7);border:1px solid rgba(37,99,235,.3);border-radius:9px;">
-      {small_brain}<span style="font-size:.82rem;font-weight:700;color:#E2E8F0;">{ph_label}</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;
-                background:rgba(15,23,42,.7);border:1px solid rgba(37,99,235,.3);border-radius:9px;">
-      {small_target}<span style="font-size:.82rem;font-weight:700;color:#E2E8F0;">{as_label}</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;
-                background:rgba(15,23,42,.7);border:1px solid rgba(37,99,235,.3);border-radius:9px;">
-      {small_chart}<span style="font-size:.82rem;font-weight:700;color:#E2E8F0;">{rep_label}</span>
-    </div>
+    <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;background:rgba(15,23,42,.7);border:1px solid rgba(37,99,235,.3);border-radius:9px;">{small_brain}<span style="font-size:.82rem;font-weight:700;color:#E2E8F0;">{ph_label}</span></div>
+    <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;background:rgba(15,23,42,.7);border:1px solid rgba(37,99,235,.3);border-radius:9px;">{small_target}<span style="font-size:.82rem;font-weight:700;color:#E2E8F0;">{as_label}</span></div>
+    <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;background:rgba(15,23,42,.7);border:1px solid rgba(37,99,235,.3);border-radius:9px;">{small_chart}<span style="font-size:.82rem;font-weight:700;color:#E2E8F0;">{rep_label}</span></div>
   </div>
   <div style="border-top:1px solid rgba(37,99,235,.2);padding-top:12px;">
     <div style="font-size:.75rem;font-weight:800;color:#7DD3FC;letter-spacing:.05em;margin-bottom:8px;direction:{dir_attr};text-align:{text_align};">{diff_title}</div>
@@ -1196,23 +976,16 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
   </div>
 </div>""", unsafe_allow_html=True)
 
-    # Difficulty + Start button inside form_col
     with form_col:
-        # Difficulty level selector
         current_diff  = st.session_state.get("difficulty","medium")
-        is_arabic_now = st.session_state["language"] == "Arabic"
-
         if st.session_state.get("language","English") == "Arabic":
             ordered = [("easy","🟢  مبتدئ"),("medium","🟡  متوسط"),("hard","🔴  متقدم")]
         else:
             ordered = [("easy","🟢  Beginner"),("medium","🟡  Intermediate"),("hard","🔴  Advanced")]
 
-        # For Arabic: مبتدئ on right, متوسط center, متقدم left
-        # Streamlit cols go left→right: col[0]=left, col[2]=right
-        # So for RTL: display order = [hard, medium, easy] in cols [0,1,2]
         diff_cols = st.columns(3)
         if st.session_state.get("language","English") == "Arabic":
-            ordered_display = list(reversed(ordered))  # متقدم, متوسط, مبتدئ
+            ordered_display = list(reversed(ordered))
         else:
             ordered_display = ordered
 
@@ -1227,8 +1000,6 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-        # ── Researcher Mode: AI Provider selector (hidden from normal users) ──
-        # Access via: ?mode=researcher in the URL
         if st.query_params.get("mode") == "researcher":
             st.markdown('<div style="height:.5rem"></div>', unsafe_allow_html=True)
             st.markdown(f'<div style="font-size:.75rem;font-weight:800;color:#F59E0B;letter-spacing:.06em;margin-bottom:.5rem;direction:{dir_attr};">🔬 RESEARCHER MODE — AI Provider</div>', unsafe_allow_html=True)
@@ -1251,7 +1022,6 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
                         st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
             st.markdown(f'<div style="font-size:.72rem;color:#64748B;margin-top:.3rem;direction:{dir_attr};">Active: <b style="color:#F59E0B;">{provider_options.get(cur_provider,"")}</b></div>', unsafe_allow_html=True)
-            st.markdown('<div style="height:.5rem"></div>', unsafe_allow_html=True)
 
         st.markdown('<div class="start-btn" style="margin-top:.8rem;">',unsafe_allow_html=True)
         if st.button(t("Start Personalised Training","ابدأ التدريب المخصص"),key="start_training", use_container_width=True):
@@ -1288,18 +1058,6 @@ div[data-baseweb="popover"] ul li{{text-align:{text_align} !important;direction:
     st.markdown(f'<div class="footer-bar">{f1}{f2}</div>',unsafe_allow_html=True)
 
 
-# =============================================================
-# PAGE 2: LEARNING PHASE
-# -------------------------------------------------------------
-# Shows 6 AI-generated phishing email examples one at a time.
-# Each example includes:
-#   - The phishing email (rendered by render_email_window)
-#     with numbered red badge indicators on suspicious elements
-#   - AI Tutor panel: indicators, why_risky, learning_tip
-# Emails are cached in session_state["emails"] so navigating
-# back does not trigger a new API call.
-# Progress bar shows current position (1 of 6 ... 6 of 6).
-# =============================================================
 def page_learning():
     is_arabic  = st.session_state["language"]=="Arabic"
     dir_attr   = 'rtl' if is_arabic else 'ltr'
@@ -1394,14 +1152,7 @@ def page_learning():
             if st.button(t("Complete Learning Phase →","← إتمام مرحلة التعلم"),key="complete_btn"):
                 st.session_state["page"]="complete"; st.rerun()
 
-# =============================================================
-# PAGE 3: LEARNING COMPLETE
-# -------------------------------------------------------------
-# Transition page shown after all 6 learning examples are done.
-# Congratulates the user and provides a button to start the
-# Assessment Phase. Also resets the assessment scenario order
-# so each assessment session is freshly shuffled.
-# =============================================================
+
 def page_complete():
     is_arabic=st.session_state["language"]=="Arabic"; da='rtl' if is_arabic else 'ltr'
     def tc(e,a): return a if is_arabic else e
@@ -1415,136 +1166,6 @@ def page_complete():
         st.rerun()
 
 
-# ══════════════════════════════════════════════════════════
-#  ASSESSMENT — DIVERSE ROLE-AWARE SCENARIOS
-# ══════════════════════════════════════════════════════════
-ASSESS_PHISHING_TYPES = [
-    ("link",  False, "", True),
-    ("pdf",   True, ".pdf", False),
-    ("xlsx",  True, ".xlsx", False),
-    ("hr_link",False,"",True),
-    ("exec",  False,"",False),
-]
-ASSESS_LEGIT_TYPES = [
-    ("meeting",     "دعوة اجتماع روتينية من نطاق المستشفى الرسمي. أسلوب مهني هادئ، لا إلحاح.","A routine meeting invitation from an official hospital domain. Professional tone, no urgency."),
-    ("maintenance", "إعلان رسمي من قسم تقنية المعلومات عن صيانة مجدولة. بريد رسمي، لا روابط مشبوهة.","Official IT department notice about scheduled maintenance. Official domain, no suspicious links."),
-    ("hr_legit",    "إشعار موارد بشرية شرعي عن دورة تدريبية أو تحديث سياسات. نطاق رسمي، لا طلب بيانات.","Legitimate HR notification about training or policy update. Official domain, no credential requests."),
-    ("manager",     "مدير القسم يرسل تحديثاً روتينياً للعمل. تواصل عمل عادي من بريد رسمي.","Department manager sending a routine work update. Normal business communication from official email."),
-    ("payslip",     "إشعار راتب أو جدول عمل شرعي من نظام الموارد البشرية الرسمي. إشعار عادي، لا عناصر مشبوهة.","Legitimate payslip or schedule notification from official HR system. Standard notification, no suspicious elements."),
-]
-
-def get_assess_shuffled_order():
-    if "assess_scenario_order" not in st.session_state:
-        order = list(range(5)); random.shuffle(order)
-        st.session_state["assess_scenario_order"] = order
-    return st.session_state["assess_scenario_order"]
-
-def build_assess_prompt(role, index, is_phishing, language):
-    is_ar      = (language == "Arabic")
-    difficulty = st.session_state.get("difficulty", "medium")
-    role_info  = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
-    role_desc, role_ctx, role_type = role_info
-    seed = st.session_state.get("cache_version", 13)
-    import time
-    session_seed = abs(hash(str(seed) + str(index) + str(is_phishing) + str(time.time()))) % 99999
-
-    role_guidance = {
-        "clinical": (
-            "a nurse, doctor, pharmacist, or lab technician in a Saudi hospital",
-            "EMR, patient records, lab results, pharmacy, clinical schedules, MOH alerts, medical devices, surgery"
-        ),
-        "admin": (
-            "a medical secretary, receptionist, patient records clerk, insurance coordinator, or billing specialist in Saudi healthcare",
-            "patient appointments, medical records, health insurance, hospital billing, medical procurement, MOH compliance"
-        ),
-        "it": (
-            "an IT specialist, system administrator, or cybersecurity officer in a Saudi hospital",
-            "hospital network, VPN, servers, EMR system, cloud backup, SSL, firewall, software licenses, IT helpdesk"
-        ),
-        "other": (
-            "a general hospital employee in Saudi Arabia",
-            "any hospital department"
-        ),
-    }
-    r_desc, r_ctx = role_guidance.get(role_type, role_guidance["other"])
-
-    if is_ar:
-        diff_rules = {
-            "easy":   "مبتدئ: نطاق مزيف واضح، أخطاء إملائية، ALL-CAPS، تحية عامة، طلب مشبوه صريح.",
-            "medium": "متوسط: نطاق مشبوه نسبياً، علامة تحذيرية واحدة، إلحاح معتدل.",
-            "hard":   "متقدم: نطاق يشبه الحقيقي مع تغيير بسيط، لغة سليمة، علامة واحدة خفية فقط.",
-        }
-        lang_rule = "عربية فصحى فقط. الروابط والبريد الإلكتروني لاتينية. حقل 'to' بريد فقط."
-        task_p = f"ولّد رسالة تصيد إلكتروني واقعية تستهدف {r_desc}. اختر نوع الهجوم بحرية كاملة من السياق: {r_ctx}. كن مبدعاً ومختلفاً."
-        task_l = f"ولّد بريد إلكتروني شرعي وطبيعي من بيئة عمل {r_desc}. استخدم نطاق رسمي (@hospital.org أو @moh.gov.sa). لا علامات تصيد."
-        expl   = "اشرح بوضوح لماذا هذا البريد " + ("تصيد إلكتروني وما هي العلامات التحذيرية" if is_phishing else "شرعي وآمن")
-        from_ex, subj_ex, body_ex = "المرسل <email@domain.com>", "موضوع الرسالة", "نص الرسالة بالعربية"
-    else:
-        diff_rules = {
-            "easy":   "BEGINNER: obvious fake domain, spelling mistakes, ALL-CAPS urgency, generic greeting, suspicious request.",
-            "medium": "INTERMEDIATE: slightly suspicious domain, 1 red flag, moderate urgency.",
-            "hard":   "ADVANCED: nearly real domain tiny change only, perfect language, only 1 subtle red flag.",
-        }
-        lang_rule = "English only throughout. Email addresses and URLs stay Latin."
-        task_p = f"Generate a realistic phishing email targeting {r_desc}. Freely choose any attack type from this context: {r_ctx}. Be creative and varied."
-        task_l = f"Generate a realistic legitimate workplace email for {r_desc}. Use official domain (@hospital.org or @moh.gov.sa). Zero suspicious elements."
-        expl   = f"Clearly explain why this email is {'phishing — identify the red flags' if is_phishing else 'legitimate and safe'}"
-        from_ex, subj_ex, body_ex = "Sender Name <email@domain.com>", "subject line", "email body in English"
-
-    diff_rule = diff_rules.get(difficulty, diff_rules["medium"])
-    task = task_p if is_phishing else task_l
-
-    return f"""Phishing awareness assessment email for Saudi healthcare. Seed:{session_seed}
-
-TARGET: {r_desc}
-CONTEXT: {r_ctx}
-
-TASK: {task}
-
-DIFFICULTY: {diff_rule}
-
-LANGUAGE: {lang_rule}
-
-FORMAT: body=plain text only, \\n for line breaks, no HTML. "to"=email address only.
-{"If phishing uses a link: put URL in suspicious_link AND in body. If attachment: put filename in attachment field." if is_phishing else 'suspicious_link:"", attachment:""'}
-{"If legitimate: use real official domain, no suspicious links or requests." if not is_phishing else ""}
-
-RETURN ONLY VALID JSON:
-{{"is_phishing":{"true" if is_phishing else "false"},"from":"{from_ex}","to":"employee@hospital.org","subject":"{subj_ex}","attachment":"","body":"{body_ex}","suspicious_link":"","explanation":"{expl}"}}"""
-
-def generate_assess_email(role, index, is_phishing, language):
-    for attempt in range(3):
-        try:
-            data = call_groq(build_assess_prompt(role, index, is_phishing, language), max_tokens=800)
-            if "error" in data:
-                return {"error": data["error"].get("message", str(data["error"]))}
-            result = parse_json_response(data["choices"][0]["message"]["content"].strip())
-            result = clean_result(result, language=="Arabic")
-            result["to"] = get_recipient(st.session_state.get("role","Clinical"), index, language)
-            # If AI included a link, make sure it appears in body
-            if result.get("suspicious_link","").strip():
-                if result["suspicious_link"] not in result.get("body",""):
-                    result["body"] = result.get("body","") + f'\n{result["suspicious_link"]}'
-            return result
-        except json.JSONDecodeError:
-            if attempt == 2:
-                return {"error": "Failed to parse. Please try again."}
-        except Exception as e:
-            return {"error": str(e)}
-
-# =============================================================
-# PAGE 4: ASSESSMENT PHASE
-# -------------------------------------------------------------
-# Presents 10 email scenarios (5 phishing + 5 legitimate) in
-# random order. The user must classify each as phishing or
-# legitimate by clicking one of two buttons.
-# After answering: shows correct/incorrect feedback only.
-# Full explanation is deferred to the Results page.
-# Emails cached in session_state["assess_emails"].
-# Pattern (which are phishing/legit) stored in assess_pattern.
-# Layout: Arabic = action panel LEFT, email RIGHT.
-#         English = email LEFT, action panel RIGHT.
-# =============================================================
 def page_assessment():
     is_arabic=st.session_state["language"]=="Arabic"; da='rtl' if is_arabic else 'ltr'
     TOTAL=10; idx=st.session_state.get("assess_index",0)
@@ -1622,16 +1243,6 @@ def page_assessment():
                     st.session_state["page"]="results"; st.rerun()
 
 
-# =============================================================
-# PAGE 5: RESULTS
-# -------------------------------------------------------------
-# Shows overall score (X/10) with colour-coded feedback.
-# Lists all 10 questions with:
-#   - tick/cross icon for correct/incorrect
-#   - phishing/legitimate badge
-#   - AI-generated explanation of WHY each email is what it is
-# Provides a "Go to Report" button to see the full analysis.
-# =============================================================
 def page_results():
     is_arabic=st.session_state["language"]=="Arabic"; da='rtl' if is_arabic else 'ltr'; TOTAL=10
     def tr(e,a): return a if is_arabic else e
@@ -1655,19 +1266,7 @@ def page_results():
     if st.button(tr("Go to Report →","← الانتقال للتقرير"),key="go_report"):
         st.session_state["page"]="report"; st.rerun()
 
-# =============================================================
-# PAGE 6: PERFORMANCE REPORT
-# -------------------------------------------------------------
-# Detailed performance breakdown showing:
-#   - Overall score and awareness level (High/Moderate/Low)
-#   - Detection rates: phishing vs legitimate separately
-#   - Strengths: what the user did well
-#   - Areas to improve: where they struggled
-#   - Recommendations: 4 practical security tips
-#   - Motivational closing message
-#   - "Retake Training" button: resets ALL session state for
-#     a completely fresh session.
-# =============================================================
+
 def page_report():
     is_arabic=st.session_state["language"]=="Arabic"; da='rtl' if is_arabic else 'ltr'; TOTAL=10
     def tp(e,a): return a if is_arabic else e
@@ -1714,8 +1313,8 @@ def page_report():
         si="".join([f'<div style="color:#6EE7B7;margin-bottom:.4rem;text-align:{"right" if is_arabic else "left"};">✅ {s}</div>' for s in strengths]) or f'<div style="color:#94A3B8;">{tp("Keep practicing","استمر في التدريب")}</div>'
         st.markdown(f'<div style="border:1px solid rgba(16,185,129,.35);border-radius:14px;padding:1.2rem;background:rgba(16,185,129,.05);direction:{da};text-align:{"right" if is_arabic else "left"};"><div style="font-weight:800;color:#F1F5F9;margin-bottom:.8rem;text-align:{"right" if is_arabic else "left"};">💪 {tp("Strengths","نقاط القوة")}</div>{si}</div>',unsafe_allow_html=True)
     with s2:
-        ai="".join([f'<div style="color:#FCA5A5;margin-bottom:.4rem;text-align:{"right" if is_arabic else "left"};">⚠️ {a}</div>' for a in areas]) or f'<div style="color:#94A3B8;">{tp("Great work!","عمل رائع!")}</div>'
-        st.markdown(f'<div style="border:1px solid rgba(239,68,68,.35);border-radius:14px;padding:1.2rem;background:rgba(239,68,68,.05);direction:{da};text-align:{"right" if is_arabic else "left"};"><div style="font-weight:800;color:#F1F5F9;margin-bottom:.8rem;text-align:{"right" if is_arabic else "left"};">📈 {tp("Areas to Improve","مجالات التحسين")}</div>{ai}</div>',unsafe_allow_html=True)
+        ai2="".join([f'<div style="color:#FCA5A5;margin-bottom:.4rem;text-align:{"right" if is_arabic else "left"};">⚠️ {a}</div>' for a in areas]) or f'<div style="color:#94A3B8;">{tp("Great work!","عمل رائع!")}</div>'
+        st.markdown(f'<div style="border:1px solid rgba(239,68,68,.35);border-radius:14px;padding:1.2rem;background:rgba(239,68,68,.05);direction:{da};text-align:{"right" if is_arabic else "left"};"><div style="font-weight:800;color:#F1F5F9;margin-bottom:.8rem;text-align:{"right" if is_arabic else "left"};">📈 {tp("Areas to Improve","مجالات التحسين")}</div>{ai2}</div>',unsafe_allow_html=True)
     st.markdown('<div style="height:1rem"></div>',unsafe_allow_html=True)
     ri="".join([f'<div style="color:#DCEBFF;margin-bottom:.5rem;text-align:{"right" if is_arabic else "left"};">📌 {r}</div>' for r in recs])
     st.markdown(f'<div style="border:1px solid rgba(37,99,235,.45);border-radius:14px;padding:1.2rem 1.5rem;background:rgba(2,6,23,.6);margin-bottom:1.5rem;direction:{da};text-align:{"right" if is_arabic else "left"};"><div style="font-weight:800;color:#F1F5F9;margin-bottom:.8rem;text-align:{"right" if is_arabic else "left"};">💡 {tp("Recommendations","التوصيات")}</div>{ri}</div>',unsafe_allow_html=True)
@@ -1725,9 +1324,7 @@ def page_report():
             st.session_state.pop(k,None)
         st.rerun()
 
-# =============================================================
-# PAGE 0: LOGIN
-# =============================================================
+
 def page_login():
     is_arabic = st.session_state["language"] == "Arabic"
     da = 'rtl' if is_arabic else 'ltr'
@@ -1743,86 +1340,33 @@ def page_login():
 #MainMenu,header,footer{{visibility:hidden;}}
 .stApp{{background:radial-gradient(circle at top left,#0B2E68 0%,#020617 35%,#020617 100%);color:white;}}
 .block-container{{max-width:480px;padding-top:4rem;}}
-.stTextInput>div>div>input{{
-    background:rgba(15,23,42,.88) !important;color:white !important;
-    border:1px solid rgba(37,99,235,.55) !important;border-radius:12px !important;
-    min-height:48px;direction:{da};font-size:.95rem !important;
-}}
+.stTextInput>div>div>input{{background:rgba(15,23,42,.88) !important;color:white !important;border:1px solid rgba(37,99,235,.55) !important;border-radius:12px !important;min-height:48px;direction:{da};font-size:.95rem !important;}}
 .stTextInput label{{color:#94A3B8 !important;font-size:.85rem !important;}}
-.stButton>button {{
-    width:100% !important;
-    min-height:48px !important;
-    max-height:48px !important;
-    font-weight:700 !important;
-    border-radius:12px !important;
-    font-size:.9rem !important;
-    padding:0 16px !important;
-    line-height:48px !important;
-}}
-/* Back button */
-div[data-testid="stHorizontalBlock"] > div:first-child .stButton>button {{
-    background:rgba(15,23,42,.88) !important;
-    color:#EAF4FF !important;
-    border:1px solid rgba(37,99,235,.55) !important;
-}}
-/* Continue button - border only */
-div[data-testid="stHorizontalBlock"] > div:last-child .stButton>button {{
-    background:rgba(15,23,42,.88) !important;
-    color:#EAF4FF !important;
-    border:1px solid rgba(37,99,235,.55) !important;
-}}
+.stButton>button{{width:100% !important;min-height:48px !important;max-height:48px !important;font-weight:700 !important;border-radius:12px !important;font-size:.9rem !important;padding:0 16px !important;line-height:48px !important;}}
+div[data-testid="stHorizontalBlock"] > div:first-child .stButton>button{{background:rgba(15,23,42,.88) !important;color:#EAF4FF !important;border:1px solid rgba(37,99,235,.55) !important;}}
+div[data-testid="stHorizontalBlock"] > div:last-child .stButton>button{{background:rgba(15,23,42,.88) !important;color:#EAF4FF !important;border:1px solid rgba(37,99,235,.55) !important;}}
 </style>""", unsafe_allow_html=True)
 
     st.markdown(f"""
-<div style="text-align:center;padding:2.5rem 2rem 2rem;
-            border:1px solid rgba(37,99,235,.45);border-radius:24px;
-            background:linear-gradient(135deg,rgba(2,6,23,.96),rgba(8,47,73,.88));
-            direction:{da};margin-bottom:1.5rem;">
+<div style="text-align:center;padding:2.5rem 2rem 2rem;border:1px solid rgba(37,99,235,.45);border-radius:24px;background:linear-gradient(135deg,rgba(2,6,23,.96),rgba(8,47,73,.88));direction:{da};margin-bottom:1.5rem;">
   <div style="font-size:2.8rem;margin-bottom:.8rem;">{page_icon}</div>
   <div style="font-size:1.4rem;font-weight:900;color:#F8FAFC;margin-bottom:.4rem;">{page_title}</div>
   <div style="font-size:.9rem;color:#94A3B8;">{page_sub}</div>
 </div>""", unsafe_allow_html=True)
 
     if is_arabic:
-        st.markdown(f'''<style>
-.stTextInput label{{direction:rtl;text-align:right;display:block;}}
-.stTextInput input{{text-align:right;direction:rtl;}}
-</style>''', unsafe_allow_html=True)
+        st.markdown('<style>.stTextInput label{direction:rtl;text-align:right;display:block;}.stTextInput input{text-align:right;direction:rtl;}</style>', unsafe_allow_html=True)
 
-    user_name  = st.text_input(
-        tl("Full name","الاسم الكامل"),
-        value=st.session_state.get("user_name",""),
-        placeholder=tl("e.g. Dr. Sarah Al-Mutairi","مثال: د. سارة المطيري")
-    )
-    user_email = st.text_input(
-        tl("Email address","البريد الإلكتروني"),
-        value=st.session_state.get("user_email",""),
-        placeholder="name@hospital.org"
-    )
+    user_name  = st.text_input(tl("Full name","الاسم الكامل"), value=st.session_state.get("user_name",""), placeholder=tl("e.g. Dr. Sarah Al-Mutairi","مثال: د. سارة المطيري"))
+    user_email = st.text_input(tl("Email address","البريد الإلكتروني"), value=st.session_state.get("user_email",""), placeholder="name@hospital.org")
 
     st.markdown('<div style="height:.8rem;"></div>', unsafe_allow_html=True)
-
-    st.markdown("""<style>
-/* Force both login page buttons to exact same height */
-div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button {
-    height:48px !important;
-    min-height:48px !important;
-    max-height:48px !important;
-    padding-top:0 !important;
-    padding-bottom:0 !important;
-    line-height:48px !important;
-    display:flex !important;
-    align-items:center !important;
-    justify-content:center !important;
-    box-sizing:border-box !important;
-}
-</style>""", unsafe_allow_html=True)
+    st.markdown("""<style>div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button{height:48px !important;min-height:48px !important;max-height:48px !important;padding-top:0 !important;padding-bottom:0 !important;display:flex !important;align-items:center !important;justify-content:center !important;box-sizing:border-box !important;}</style>""", unsafe_allow_html=True)
 
     c1, c2 = st.columns([1,1])
     with c1:
         if st.button(tl("← Back","← رجوع"), key="login_back", use_container_width=True):
-            st.session_state["page"] = "home"
-            st.rerun()
+            st.session_state["page"] = "home"; st.rerun()
     with c2:
         if st.button(tl("Continue","متابعة"), key="login_continue", use_container_width=True):
             email_pattern = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
@@ -1831,15 +1375,12 @@ div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button {
             elif not user_email.strip():
                 st.warning(tl("⚠️ Please enter your email address.","⚠️ يرجى إدخال بريدك الإلكتروني"))
             elif not email_pattern.match(user_email.strip()):
-                st.warning(tl("⚠️ Please enter a valid email address (e.g. name@hospital.org).",
-                              "⚠️ يرجى إدخال بريد إلكتروني صحيح مثل: name@hospital.org"))
+                st.warning(tl("⚠️ Please enter a valid email address (e.g. name@hospital.org).","⚠️ يرجى إدخال بريد إلكتروني صحيح مثل: name@hospital.org"))
             else:
                 st.session_state["user_name"]  = user_name.strip()
                 st.session_state["user_email"] = user_email.strip()
-                st.session_state["page"] = "home"
-                st.rerun()
+                st.session_state["page"] = "home"; st.rerun()
 
-# ── ROUTER ─────────────────────────────────────────────────
 pg=st.session_state.get("page","home")
 {"home":page_home,"login":page_login,"learning":page_learning,"complete":page_complete,
  "assessment":page_assessment,"results":page_results,"report":page_report}.get(pg,page_home)()
