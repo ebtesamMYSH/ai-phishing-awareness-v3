@@ -204,7 +204,15 @@ EN_NAMES = {
 def get_recipient(role, index, language):
     role_info = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
     _, _, role_type = role_info
-    pool = EN_NAMES.get(role_type, EN_NAMES["clinical"])
+    # للـ Other: نختار pool حسب نوع السيناريو (Admin→IT→Clinical بالتناوب)
+    if role_type == "other":
+        # السيناريوهات: 0=Admin, 1=IT, 2=Clinical, 3=Admin, 4=IT, 5=Clinical
+        other_pool_map = {0: "admin", 1: "it", 2: "clinical",
+                          3: "admin", 4: "it",  5: "clinical"}
+        pool_type = other_pool_map.get(index % 6, "other")
+        pool = EN_NAMES.get(pool_type, EN_NAMES["other"])
+    else:
+        pool = EN_NAMES.get(role_type, EN_NAMES["clinical"])
     return pool[index % len(pool)]
 
 PHISHING_SCENARIOS = [
@@ -266,19 +274,19 @@ FORCED_SCENARIOS = {
         {"en": "SCENARIO: Fake firewall policy update — send a malicious Word document claiming to contain a new mandatory firewall security policy requiring macro enablement.", "ar": "السيناريو: سياسة جدار ناري مزيفة — مستند Word يطلب تفعيل الماكرو."},
     ],
     "other": [
-        # مزيج متنوع من الثلاثة أدوار — واحد من كل نوع بالتناوب
-        {"en": "SCENARIO (Admin mix): Fake supplier invoice for medical equipment — urgent payment SAR 150,000. Use PDF attachment. IMPORTANT: vary supplier name, equipment type (surgical/lab/radiology/ICU), invoice number, and PDF filename each time. Target: general hospital employee.",
-         "ar": "السيناريو (إداري): فاتورة مورد معدات طبية مزيفة تطلب دفع 150,000 ريال. مرفق PDF. الهدف: موظف عام في المستشفى."},
-        {"en": "SCENARIO (Clinical mix): Fake EMR system credential harvest — urgent login re-verification via suspicious link. IMPORTANT: vary system name (EMR/staff portal/patient system), suspicious link URL, and ONE spelling mistake (credintials OR urgant OR acces) each time. Target: general hospital employee.",
-         "ar": "السيناريو (سريري): سرقة بيانات نظام السجلات الطبية — ادّعِ أن النظام يحتاج إعادة التحقق من بيانات الدخول. الهدف: موظف عام."},
-        {"en": "SCENARIO (IT mix): Fake hospital network security alert — claim a critical security vulnerability was detected and employee must update credentials immediately via suspicious portal. Target: general hospital employee.",
-         "ar": "السيناريو (تقني): تنبيه أمني مزيف للشبكة — ادّعِ اكتشاف ثغرة حرجة وأن الموظف يجب تحديث بياناته فوراً. الهدف: موظف عام."},
-        {"en": "SCENARIO (Admin mix): Fake HR payroll notification — claim salary payment is on hold until employee updates bank account details via suspicious link. Target: general hospital employee.",
-         "ar": "السيناريو (إداري): إشعار رواتب مزيف — ادّعِ أن صرف الراتب موقوف حتى يحدّث الموظف بيانات حسابه البنكي. الهدف: موظف عام."},
-        {"en": "SCENARIO (Clinical mix): Fake MOH health alert — impersonate Ministry of Health sending urgent infection control protocol requiring immediate acknowledgment via link. Target: general hospital employee.",
-         "ar": "السيناريو (سريري): تنبيه صحي مزيف من وزارة الصحة يتطلب تأكيداً فورياً عبر رابط. الهدف: موظف عام."},
-        {"en": "SCENARIO (IT mix): Fake CEO/Director urgent request — impersonate hospital director urgently requesting employee to share login credentials or sensitive data immediately. Pure social engineering. Target: general hospital employee.",
-         "ar": "السيناريو (تقني/إداري): انتحال هوية مدير المستشفى يطلب من الموظف مشاركة بيانات الدخول أو معلومات حساسة فوراً. هندسة اجتماعية. الهدف: موظف عام."},
+        # مزيج متنوع حقيقي — ADMIN first, then IT, then CLINICAL, rotating
+        {"en": "SCENARIO (ADMIN): Fake payroll/HR system — salary payment on hold until employee updates bank account details (IBAN/account number). Sender pretends to be HR department. IMPORTANT: vary bank detail type, urgency deadline (end of month/within 48h/before 15th), HR manager name each time. NO attachment. Target: general hospital employee — use generic greeting 'Dear Staff'.",
+         "ar": "السيناريو (إداري): نظام رواتب مزيف — ادّعِ أن صرف راتب الموظف موقوف حتى يحدّث بيانات حسابه البنكي. المرسل يتظاهر بأنه قسم الموارد البشرية. غيّر نوع البيانات البنكية والموعد النهائي واسم مدير الموارد البشرية في كل مرة. الهدف: موظف عام."},
+        {"en": "SCENARIO (IT): Fake hospital network/VPN security alert — claim employee's network account has been flagged for suspicious activity and must re-verify credentials immediately via suspicious portal link. IMPORTANT: vary the alert type (account lockout/suspicious login/security breach), suspicious portal URL, and ONE spelling mistake each time. Target: general hospital employee — use generic greeting 'Dear Staff'.",
+         "ar": "السيناريو (تقني): تنبيه أمني مزيف للشبكة — ادّعِ أن حساب الموظف على شبكة المستشفى تم تعليقه بسبب نشاط مشبوه ويجب إعادة التحقق من بياناته فوراً عبر رابط. غيّر نوع التنبيه والرابط والخطأ الإملائي في كل مرة. الهدف: موظف عام."},
+        {"en": "SCENARIO (CLINICAL): Fake MOH urgent health directive — impersonate Ministry of Health sending a critical infection control or vaccination update requiring all hospital staff to confirm compliance by clicking a suspicious link. IMPORTANT: vary the directive topic (MRSA/COVID/vaccination campaign/antimicrobial resistance), MOH official name, and suspicious link each time. Target: general hospital employee — use generic greeting 'Dear Staff'.",
+         "ar": "السيناريو (سريري): توجيه صحي عاجل مزيف من وزارة الصحة — تظاهر بأن الوزارة ترسل تحديثاً حرجاً لمكافحة العدوى أو التطعيمات يتطلب من جميع موظفي المستشفى تأكيد الامتثال عبر رابط مشبوه. غيّر موضوع التوجيه واسم المسؤول والرابط في كل مرة. الهدف: موظف عام."},
+        {"en": "SCENARIO (ADMIN): Fake medical equipment supplier invoice — impersonate a supplier (MedSupply Co./Gulf Medical/Al-Rashid Medical) claiming an urgent invoice of SAR 75,000–150,000 must be approved via a suspicious link or PDF. IMPORTANT: vary supplier name, equipment type (surgical/lab/radiology/ICU), invoice amount, and PDF filename each time. Target: general hospital employee — use generic greeting 'Dear Staff'.",
+         "ar": "السيناريو (إداري): فاتورة مورد معدات طبية مزيفة — انتحل هوية مورد وادّعِ أن فاتورة عاجلة بقيمة 75,000-150,000 ريال يجب الموافقة عليها. غيّر اسم المورد ونوع المعدات والمبلغ واسم الملف في كل مرة. الهدف: موظف عام."},
+        {"en": "SCENARIO (IT): Fake IT helpdesk urgent alert — impersonate hospital IT helpdesk claiming employee's computer has a critical virus/malware and must click a link immediately to run a security scan and enter credentials to verify identity. IMPORTANT: vary the malware type, suspicious scan link URL, and ONE spelling mistake each time. Target: general hospital employee — use generic greeting 'Dear Staff'.",
+         "ar": "السيناريو (تقني): تنبيه مزيف من مكتب المساعدة — انتحل هوية قسم تقنية المعلومات وادّعِ أن جهاز الموظف مصاب بفيروس حرج ويجب النقر على رابط لإجراء فحص أمني وإدخال البيانات. غيّر نوع الفيروس والرابط والخطأ الإملائي في كل مرة. الهدف: موظف عام."},
+        {"en": "SCENARIO (CLINICAL): Fake hospital EMR/staff portal credential harvest — claim the hospital staff portal or scheduling system requires urgent re-verification of login credentials due to a system migration. IMPORTANT: vary system name (Staff Portal/Scheduling System/Patient System/Hospital Portal), suspicious link URL, and ONE spelling mistake (credintials OR urgant OR acces OR imediatly) each time. Target: general hospital employee — use generic greeting 'Dear Staff'.",
+         "ar": "السيناريو (سريري): سرقة بيانات بوابة الموظفين — ادّعِ أن بوابة الموظفين أو نظام الجداول يحتاج إعادة التحقق من بيانات الدخول بسبب ترحيل النظام. غيّر اسم النظام والرابط والخطأ الإملائي في كل مرة. الهدف: موظف عام."},
     ],
 }
 
@@ -442,6 +450,7 @@ This scenario is NON-NEGOTIABLE. Generate the email body, subject, and sender to
 - If social engineering only: "suspicious_link":"", "attachment":""
 
 ━━━ RETURN ONLY VALID JSON ━━━
+CRITICAL: Output ONLY the JSON object below. No text before it, no text after it, no explanations, no notes, no "Sincerely", no extra sentences. The response must start with {{ and end with }}.
 {{"email_type":"attack type name","from":"{from_ex}","to":"employee@hospital.org","subject":"subject line","attachment":"filename or empty","body":"{body_ex}","suspicious_text":"most suspicious phrase","suspicious_link":"url or empty","indicators":[{{"number":1,"title":"{ind_t_ex}","description":"{ind_d_ex}"}},{{"number":2,"title":"{ind_t_ex}","description":"{ind_d_ex}"}},{{"number":3,"title":"{ind_t_ex}","description":"{ind_d_ex}"}}],"why_risky":"why dangerous for this role","learning_tip":"practical tip for this role"}}"""
 
 # =============================================================
@@ -609,7 +618,7 @@ def build_assess_prompt(role, index, is_phishing, language):
         },
         "it": {
             True: [
-                "MANDATORY PHISHING — IT/VPN: Fake VPN re-authentication alert. Vary: VPN name (Cisco AnyConnect/FortiClient/Pulse Secure/GlobalProtect), suspicious portal URL, urgency reason (security update/certificate renewal/mandatory re-auth). Target: IT specialist.",
+                "MANDATORY PHISHING — IT/Helpdesk: Fake IT helpdesk remote support ticket — claim a critical server/network issue requires IT specialist to click a link and provide admin credentials immediately to allow remote access. Vary: ticket number, reported issue (EMR server down/network outage/database error), requester name, suspicious link URL. Target: IT specialist.",
                 "MANDATORY PHISHING — IT/SSL: Fake SSL certificate expiry for hospital system. Vary: affected system (hospital website/patient portal/EMR login/staff intranet/lab system), renewal deadline, suspicious link URL. Target: system administrator.",
                 "MANDATORY PHISHING — IT/Helpdesk: Fake helpdesk ticket requesting remote access or credentials. Vary: ticket reference number, reported issue (server outage/network fault/EMR performance), requester name. Target: IT helpdesk staff.",
                 "MANDATORY PHISHING — IT/CIO: CIO or CISO impersonation — urgent server credentials or disable security settings. Vary: executive name, specific system (firewall/server/database), urgency reason. Pure social engineering. Target: IT specialist.",
@@ -800,6 +809,7 @@ FORMAT: body=plain text only, \\n for line breaks, no HTML. "to"=email address o
 {"If legitimate: use real official domain (@hospital.org or @moh.gov.sa), no suspicious links, no urgent credential requests.' " if not is_phishing else ""}
 
 RETURN ONLY VALID JSON:
+CRITICAL: Output ONLY the JSON object below. No text before it, no text after it, no explanations, no extra content whatsoever. Start with {{ end with }}.
 {{"is_phishing":{"true" if is_phishing else "false"},"from":"{from_ex}","to":"employee@hospital.org","subject":"{subj_ex}","attachment":"","body":"{body_ex}","suspicious_link":"","explanation":"{expl}"}}"""
 
 def get_system_prompt():
@@ -916,7 +926,7 @@ def call_ai(prompt, max_tokens=1600):
                 "Authorization": f"Bearer {get_secret('GROQ_API_KEY')}"
             },
             json={
-                "model":       "llama-3.1-8b-instant",  # مؤقت للتطوير — يرجع لـ 70b للنسخة النهائية
+                "model":       "llama-3.3-70b-versatile",
                 "max_tokens":  max_tokens,
                 "temperature": 0.85,
                 "messages":    [
