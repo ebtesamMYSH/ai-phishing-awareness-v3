@@ -770,6 +770,18 @@ def build_assess_prompt(role, index, is_phishing, language):
     else:
         lang_rule = "Language: English only throughout. No Arabic or foreign characters in text fields. Email addresses and URLs stay Latin."
 
+    # تعريف المتغيرات المستخدمة في JSON template
+    if is_ar:
+        from_ex = "اسم المرسل <email@domain.com>"
+        subj_ex = "موضوع الرسالة"
+        body_ex = "نص الرسالة بالعربية الفصحى"
+        expl    = "اشرح بوضوح لماذا هذا البريد " + ("تصيد إلكتروني وما هي علاماته التحذيرية" if is_phishing else "شرعي وآمن وما الذي يجعله موثوقاً")
+    else:
+        from_ex = "Sender Name <email@domain.com>"
+        subj_ex = "subject line"
+        body_ex = "email body in English"
+        expl    = f"Clearly explain why this email is {'phishing and identify the red flags' if is_phishing else 'legitimate and safe'}"
+
     return f"""Phishing awareness assessment email for Saudi healthcare. Seed:{session_seed}
 
 TARGET: {r_desc}
