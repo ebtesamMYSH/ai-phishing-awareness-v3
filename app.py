@@ -815,7 +815,20 @@ def render_email_window(email, is_arabic, show_badges=False):
 
     body_raw        = re.sub(r'<[^>]+>','', email.get("body",""))
     suspicious_text = re.sub(r'<[^>]+>','', email.get("suspicious_text",""))
-    suspicious_link = re.sub(r'<[^>]+>','', email.get("suspicious_link",""))
+    suspicious_link = re.sub(r'<[^>]+>','', email.get("suspicious_link","")).strip()
+
+    # ── Clean body: remove "suspicious_link:" prefix if AI included it ──
+    # The AI sometimes writes "suspicious_link: https://..." in the body text
+    body_raw = re.sub(r'suspicious_link\s*:\s*', '', body_raw, flags=re.IGNORECASE)
+    body_raw = re.sub(r'suspicious_text\s*:\s*', '', body_raw, flags=re.IGNORECASE)
+
+    # ── Ensure suspicious_link appears in body for highlighting ─────────
+    if suspicious_link and suspicious_link not in body_raw:
+        # Check if a variant exists without protocol
+        link_bare = re.sub(r'^https?://', '', suspicious_link)
+        if link_bare not in body_raw:
+            body_raw = body_raw.rstrip() + f'\n\n{suspicious_link}'
+
     has_attachment  = bool(email.get("attachment","").strip())
 
     body_html   = html_lib.escape(body_raw)
