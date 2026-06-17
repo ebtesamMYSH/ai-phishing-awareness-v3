@@ -916,7 +916,7 @@ def call_ai(prompt, max_tokens=1600):
                 "Authorization": f"Bearer {get_secret('GROQ_API_KEY')}"
             },
             json={
-                "model":       "llama-3.3-70b-versatile",  # ← FIX 1: upgraded from 8b to 70b
+                "model":       "llama-3.1-8b-instant",  # مؤقت للتطوير — يرجع لـ 70b للنسخة النهائية
                 "max_tokens":  max_tokens,
                 "temperature": 0.85,
                 "messages":    [
