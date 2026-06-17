@@ -484,42 +484,88 @@ RETURN ONLY VALID JSON:
 
 def get_system_prompt():
     """
-    FIX 4: System prompt منفصل يُقيّد النموذج بصرامة حسب الصعوبة.
-    يُضاف كـ system message في كل API call لضمان الالتزام بالمستوى.
+    FIX 4+5: System prompt يُقيّد النموذج بصرامة حسب الصعوبة والـ role.
+    - FIX 4: قواعد الصعوبة (Easy/Medium/Hard)
+    - FIX 5: تعليمات الـ role لضمان أن التحية والمحتوى مناسبان للدور
     """
     difficulty = st.session_state.get("difficulty", "medium")
+    role       = st.session_state.get("role", "Clinical")
+    role_info  = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
+    _, _, role_type = role_info
+
+    # تعليمات الـ role للتحية والمحتوى
+    role_greetings = {
+        "clinical": (
+            "TARGET ROLE: Clinical staff (nurses, doctors, pharmacists, lab technicians).\n"
+            "GREETING: Use 'Dear Dr. [Name]' or 'Dear Nurse [Name]' — medical titles only.\n"
+            "CONTENT: Must relate to EMR systems, patient records, clinical schedules, lab results, pharmacy, MOH medical alerts, medical device updates, or clinical protocols.\n"
+            "DO NOT use administrative, billing, or IT content."
+        ),
+        "admin": (
+            "TARGET ROLE: Administrative/management staff — pick ONE specific sub-role each time (rotate between them):\n"
+            "  - Medical Secretary: manages doctor schedules, correspondence, referral letters\n"
+            "  - Receptionist: patient check-in, phone calls, appointment booking\n"
+            "  - Patient Records Clerk: patient files, medical history, document archiving\n"
+            "  - Insurance Coordinator: health insurance claims, pre-authorizations, coverage updates\n"
+            "  - Billing Specialist: invoices, payments, accounts receivable, supplier contracts\n"
+            "  - Procurement Officer: medical equipment orders, supplier relationships, purchase orders\n"
+            "  - Hospital Administrator: staff HR policies, MOH accreditation, budget approvals\n\n"
+            "GREETING: Match the sub-role — e.g. 'Dear Ms. Reem,' / 'Dear Medical Secretary,' / 'Dear Ms. Al-Zahrani,' — NEVER use 'Dr.' or medical titles.\n\n"
+            "CONTENT: Choose a DIFFERENT scenario each time — rotate through these varied attack types:\n"
+            "  1. Fake health insurance portal — update employee coverage or re-submit denied claims\n"
+            "  2. Fake supplier invoice — urgent payment for medical equipment delivery\n"
+            "  3. Fake payroll/HR system — update bank account or salary information\n"
+            "  4. Fake patient appointment system — verify login after system migration\n"
+            "  5. Fake MOH accreditation request — upload required compliance documents\n"
+            "  6. Fake HR policy acknowledgment — click link to confirm new leave/overtime policy\n"
+            "  7. Fake medical procurement portal — renew supplier contract before expiry\n"
+            "  8. CEO/director impersonation — urgent financial transfer or sensitive data request\n\n"
+            "DO NOT repeat the same scenario. DO NOT use clinical (lab/pharmacy/EMR) or IT infrastructure content."
+        ),
+        "it": (
+            "TARGET ROLE: IT/Informatics staff (IT specialist, system administrator, cybersecurity officer).\n"
+            "GREETING: Use 'Dear [Name],' or 'Dear IT Team,' or 'Dear Mr./Ms. [Name]' — NOT 'Dr.'.\n"
+            "CONTENT: Must relate to VPN access, network infrastructure, server maintenance, EMR system updates, SSL certificates, firewall rules, software licenses, IT helpdesk, or endpoint security.\n"
+            "DO NOT use clinical or administrative content."
+        ),
+    }
+    role_instruction = role_greetings.get(role_type, role_greetings["admin"])
+
     sys_prompts = {
         "easy": (
-            "You are a cybersecurity trainer generating phishing email examples. "
+            "You are a cybersecurity trainer generating phishing email examples.\n\n"
+            f"{role_instruction}\n\n"
             "EASY level RULES — you MUST follow ALL of these strictly:\n"
             "1. Use a CLEARLY FAKE domain (e.g. hosp1tal-updates.xyz, hospital-secure.net, moh-alert.xyz)\n"
             "2. Include EXACTLY 2 obvious spelling mistakes in the body (e.g. 'clic' instead of 'click', 'acess' instead of 'access')\n"
             "3. Use ALL-CAPS for at least 2 sentences to show aggressive urgency\n"
-            "4. Use ONLY generic greeting: 'Dear Staff' — NEVER use a name\n"
-            "5. Make an obviously suspicious request (share password, enter full credentials)\n"
+            "4. Use ONLY generic greeting: 'Dear Staff' — NEVER use a personal name\n"
+            "5. Make an obviously suspicious request (share password, enter full credentials immediately)\n"
             "These rules are NON-NEGOTIABLE for EASY difficulty."
         ),
         "medium": (
-            "You are a cybersecurity trainer generating phishing email examples. "
+            "You are a cybersecurity trainer generating phishing email examples.\n\n"
+            f"{role_instruction}\n\n"
             "MEDIUM level RULES — you MUST follow ALL of these strictly:\n"
             "1. Use a slightly suspicious domain that looks almost real (e.g. hospital-hr-portal.net, moh-staff-portal.com) — NOT obviously fake\n"
             "2. Include EXACTLY 1 minor spelling mistake in the body — just one subtle error\n"
             "3. Use normal sentence case — NO ALL-CAPS sentences at all\n"
             "4. Show moderate urgency with a deadline like 'Please respond by end of week' — NOT threatening language\n"
-            "5. Use semi-personal greeting with job title but wrong/generic name (e.g. 'Dear Dr. Ahmed')\n"
+            "5. Use semi-personal greeting appropriate to the role (see TARGET ROLE above)\n"
             "6. Make a request that is unusual but not impossible in a workplace\n"
             "These rules are NON-NEGOTIABLE for MEDIUM difficulty. Do NOT use ALL-CAPS urgency."
         ),
         "hard": (
-            "You are a cybersecurity trainer generating phishing email examples. "
+            "You are a cybersecurity trainer generating phishing email examples.\n\n"
+            f"{role_instruction}\n\n"
             "HARD level RULES — you MUST follow ALL of these strictly:\n"
-            "1. Use a domain that looks almost identical to the real one with ONE tiny change (e.g. hosp1tal.org, hospital-sa.net, moh.gov-sa.com)\n"
-            "2. ZERO spelling or grammar mistakes — perfect professional language\n"
-            "3. ZERO ALL-CAPS — completely normal professional tone throughout\n"
+            "1. Use a domain that looks almost identical to the real one with ONE tiny character change only (e.g. hosp1tal.org, hospital-sa.net, moh.gov-sa.com, saudimoh.net)\n"
+            "2. ZERO spelling or grammar mistakes — perfect professional language throughout\n"
+            "3. ZERO ALL-CAPS — completely normal professional tone\n"
             "4. Use subtle polite urgency ONLY (e.g. 'Kindly review before end of business day')\n"
-            "5. Use full name and exact job title in greeting (e.g. 'Dear Dr. Sarah Al-Mutairi,')\n"
+            "5. Use full name and exact job title appropriate to the role in greeting\n"
             "6. Include ONLY ONE subtle red flag — everything else must look completely legitimate\n"
-            "These rules are NON-NEGOTIABLE for HARD difficulty. The email must look almost real."
+            "These rules are NON-NEGOTIABLE for HARD difficulty. The email must look almost completely real."
         ),
     }
     return sys_prompts.get(difficulty, sys_prompts["medium"])
@@ -1371,8 +1417,20 @@ def page_report():
     st.markdown(f'<div style="border:1px solid rgba(37,99,235,.45);border-radius:14px;padding:1.2rem 1.5rem;background:rgba(2,6,23,.6);margin-bottom:1.5rem;direction:{da};text-align:{"right" if is_arabic else "left"};"><div style="font-weight:800;color:#F1F5F9;margin-bottom:.8rem;text-align:{"right" if is_arabic else "left"};">💡 {tp("Recommendations","التوصيات")}</div>{ri}</div>',unsafe_allow_html=True)
     st.markdown(f'<div style="text-align:center;padding:.8rem;border:1px solid rgba(37,99,235,.3);border-radius:10px;background:rgba(37,99,235,.08);color:#7DD3FC;margin-bottom:1.5rem;">⭐ {tp("Your awareness helps keep your organization safe","وعيك يساهم في حماية مؤسستك")}</div>',unsafe_allow_html=True)
     if st.button(tp("Retake Training","إعادة التدريب من البداية"),key="retake", use_container_width=True):
-        for k in ["page","example_index","emails","assess_index","assess_emails","assess_answers","assess_pattern","cache_version","role","scenario_order","assess_scenario_order","difficulty","user_name","user_email","lang_explicitly_chosen","diff_explicitly_chosen"]:
-            st.session_state.pop(k,None)
+        # FIX 6: مسح كامل لكل session data لضمان تنوع المحتوى
+        keys_to_clear = [
+            "page","example_index","emails","assess_index",
+            "assess_emails","assess_answers","assess_pattern",
+            "cache_version","role","scenario_order",
+            "assess_scenario_order","difficulty",
+            "user_name","user_email",
+            "lang_explicitly_chosen","diff_explicitly_chosen",
+            "login_mode","assess_index",
+        ]
+        for k in keys_to_clear:
+            st.session_state.pop(k, None)
+        # تجديد الـ cache_version لإجبار النموذج على توليد محتوى جديد
+        st.session_state["cache_version"] = int(__import__("time").time()) % 99999
         st.rerun()
 
 
