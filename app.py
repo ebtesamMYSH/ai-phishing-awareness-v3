@@ -559,6 +559,15 @@ def build_assess_prompt(role, index, is_phishing, language):
             ),
         }
     diff_rule = diff_rules.get(difficulty, diff_rules["medium"])
+
+    # تعريف task_p و task_l — يُستخدمان كـ "Additional context" في الـ prompt
+    if is_ar:
+        task_p = f"ولّد رسالة تصيد إلكتروني واقعية تستهدف {r_desc}. اتبع السيناريو الإجباري أعلاه بدقة."
+        task_l = f"ولّد بريد إلكتروني شرعي وطبيعي من بيئة عمل {r_desc}. استخدم نطاق رسمي (@hospital.org أو @moh.gov.sa). لا علامات تصيد إطلاقاً."
+    else:
+        task_p = f"Generate a realistic phishing email targeting {r_desc}. Follow the MANDATORY SCENARIO above exactly."
+        task_l = f"Generate a realistic legitimate workplace email for {r_desc}. Use official domain (@hospital.org or @moh.gov.sa). Zero suspicious elements — must look completely normal."
+
     task = task_p if is_phishing else task_l
 
     # FIX 7b: Forced scenario for assessment based on index + is_phishing
