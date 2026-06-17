@@ -267,9 +267,9 @@ FORCED_SCENARIOS = {
     ],
     "other": [
         # مزيج متنوع من الثلاثة أدوار — واحد من كل نوع بالتناوب
-        {"en": "SCENARIO (Admin mix): Fake supplier invoice for medical equipment — urgent payment SAR 150,000. Use PDF attachment. Target: general hospital employee.",
+        {"en": "SCENARIO (Admin mix): Fake supplier invoice for medical equipment — urgent payment SAR 150,000. Use PDF attachment. IMPORTANT: vary supplier name, equipment type (surgical/lab/radiology/ICU), invoice number, and PDF filename each time. Target: general hospital employee.",
          "ar": "السيناريو (إداري): فاتورة مورد معدات طبية مزيفة تطلب دفع 150,000 ريال. مرفق PDF. الهدف: موظف عام في المستشفى."},
-        {"en": "SCENARIO (Clinical mix): Fake EMR system credential harvest — claim the hospital electronic medical records system requires urgent login re-verification via suspicious link. Target: general hospital employee.",
+        {"en": "SCENARIO (Clinical mix): Fake EMR system credential harvest — urgent login re-verification via suspicious link. IMPORTANT: vary system name (EMR/staff portal/patient system), suspicious link URL, and ONE spelling mistake (credintials OR urgant OR acces) each time. Target: general hospital employee.",
          "ar": "السيناريو (سريري): سرقة بيانات نظام السجلات الطبية — ادّعِ أن النظام يحتاج إعادة التحقق من بيانات الدخول. الهدف: موظف عام."},
         {"en": "SCENARIO (IT mix): Fake hospital network security alert — claim a critical security vulnerability was detected and employee must update credentials immediately via suspicious portal. Target: general hospital employee.",
          "ar": "السيناريو (تقني): تنبيه أمني مزيف للشبكة — ادّعِ اكتشاف ثغرة حرجة وأن الموظف يجب تحديث بياناته فوراً. الهدف: موظف عام."},
@@ -477,139 +477,157 @@ def build_assess_prompt(role, index, is_phishing, language):
     }
     r_desc, r_ctx = role_guidance.get(role_type, role_guidance["other"])
 
-    # FIX 3: Expanded difficulty rules for assessment — same detail as learning
+    # FIX 3+10: diff_rules مطابقة للتعلم — مخصصة لكل دور
+    # ══════════════════════════════════════════════════════
+    # diff_rules — مطابقة لقسم التعلم تماماً
+    # مخصصة لكل دور في كل مستوى (AR + EN)
+    # ══════════════════════════════════════════════════════
+    role_domains = {
+        "admin":    {"easy": "hosp1tal-hr.xyz / moh-pay.net",
+                     "medium": "hospital-hr-portal.net / moh-billing.com",
+                     "hard":   "moh.gov-sa.com / hosp1tal.org"},
+        "clinical": {"easy": "emr-secure.xyz / medrecords.net",
+                     "medium": "emr-health-sa.net / moh-clinic.com",
+                     "hard":   "hosp1tal-clinic.org / moh.gov.sa-health.com"},
+        "it":       {"easy": "vpn-update.xyz / sysadmin-alert.net",
+                     "medium": "vpn-hospital-sa.net / itsupport-moh.com",
+                     "hard":   "hosp1tal-it.org / moh-itsupport.sa.com"},
+        "other":    {"easy": "hospital-alert.xyz / hosp1tal-secure.net",
+                     "medium": "hospital-portal-sa.net / moh-staff.com",
+                     "hard":   "hosp1tal.org / moh.gov-sa.com"},
+    }
+    rd = role_domains.get(role_type, role_domains["admin"])
+
     if is_ar:
         diff_rules = {
             "easy": (
-                "مستوى مبتدئ — العلامات يجب أن تكون واضحة جداً:\n"
-                "- نطاق مزيف واضح (مثل hosp1tal-updates.xyz أو hospital.totally-fake.net)\n"
-                "- خطأين إملائيين واضحين في نص الرسالة\n"
-                "- إلحاح مبالغ فيه بعبارات تحذيرية كبيرة\n"
-                "- تحية عامة فقط: 'عزيزي الموظف' — ممنوع الاسم\n"
-                "- طلب صريح ومشبوه جداً (شارك كلمة المرور، أدخل بياناتك)"
+                "مستوى مبتدئ — العلامات يجب أن تكون واضحة جداً ولا تخطئها:\n"
+                f"- نطاق مزيف واضح تماماً مناسب للدور (مثل {rd['easy']})\n"
+                "- خطأين إملائيين واضحين على الأقل في نص الرسالة\n"
+                "- إلحاح مبالغ فيه بعبارات كبيرة (تصرف الآن! حسابك سيُغلق! موعد نهائي اليوم!)\n"
+                "- تحية عامة فقط: 'عزيزي الموظف' أو 'عزيزي الفريق' — ممنوع الاسم\n"
+                "- طلب صريح ومشبوه جداً (شارك كلمة المرور، أدخل بياناتك كاملة)\n"
+                "- عنوان المرسل واضح الزيف"
             ),
             "medium": (
-                "مستوى متوسط — صعوبة معتدلة:\n"
-                "- نطاق مشبوه نسبياً (مثل hospital-hr-portal.net)\n"
-                "- أسلوب شبه مهني مع علامة أو اثنتين\n"
-                "- خطأ إملائي واحد أو جملة غير طبيعية\n"
-                "- إلحاح معتدل ('يرجى الرد بنهاية الأسبوع')\n"
-                "- تحية شبه شخصية (اللقب صح، الاسم أحياناً خاطئ)"
+                "مستوى متوسط — صعوبة معتدلة، بعض العلامات تحتاج تمعّناً:\n"
+                f"- نطاق مشبوه نسبياً مناسب للدور (مثل {rd['medium']})\n"
+                "- أسلوب شبه مهني مع علامة تحذيرية واحدة أو اثنتين فقط\n"
+                "- خطأ إملائي واحد بسيط فقط في النص\n"
+                "- إلحاح معتدل ('يرجى الرد بنهاية الأسبوع') — ممنوع ALL CAPS\n"
+                "- تحية شبه شخصية (اللقب صح لكن الاسم أحياناً عام أو خاطئ)\n"
+                "- الطلب غير عادي لكن ليس مستحيلاً في بيئة العمل"
             ),
             "hard": (
-                "مستوى متقدم — العلامات خفية جداً:\n"
-                "- نطاق يشبه الحقيقي مع تغيير بسيط جداً (مثل hosp1tal.org أو hospital-sa.net)\n"
-                "- لغة عربية فصحى مهنية سليمة تماماً، صفر أخطاء\n"
-                "- إلحاح خفيف ومهني ('نرجو الاطلاع قبل نهاية يوم العمل')\n"
+                "مستوى متقدم — العلامات خفية جداً، الرسالة تبدو حقيقية تقريباً:\n"
+                f"- نطاق يشبه الحقيقي مع تغيير بسيط جداً مناسب للدور (مثل {rd['hard']})\n"
+                "- لغة عربية فصحى مهنية سليمة تماماً، صفر أخطاء إملائية\n"
+                "- صفر ALL CAPS — أسلوب مهني هادئ تماماً\n"
+                "- إلحاح خفيف ومهني فقط ('نرجو الاطلاع قبل نهاية يوم العمل')\n"
                 "- تحية بالاسم الكامل والمسمى الوظيفي الدقيق\n"
                 "- علامة تحذيرية واحدة فقط وخفية — كل شيء آخر يبدو حقيقياً تماماً"
             ),
         }
-        lang_rule = "عربية فصحى فقط. الروابط والبريد الإلكتروني لاتينية. حقل 'to' بريد فقط."
-        task_p = f"ولّد رسالة تصيد إلكتروني واقعية تستهدف {r_desc}. اختر نوع الهجوم بحرية كاملة من السياق: {r_ctx}. كن مبدعاً ومختلفاً."
-        task_l = f"ولّد بريد إلكتروني شرعي وطبيعي من بيئة عمل {r_desc}. استخدم نطاق رسمي (@hospital.org أو @moh.gov.sa). لا علامات تصيد إطلاقاً."
-        expl   = "اشرح بوضوح لماذا هذا البريد " + ("تصيد إلكتروني وما هي العلامات التحذيرية التي تكشفه" if is_phishing else "شرعي وآمن وما الذي يجعله موثوقاً")
-        from_ex, subj_ex, body_ex = "المرسل <email@domain.com>", "موضوع الرسالة", "نص الرسالة بالعربية"
     else:
         diff_rules = {
             "easy": (
                 "BEGINNER difficulty — red flags VERY obvious and easy to spot:\n"
-                "- Clearly fake domain (e.g. hosp1tal-updates.xyz, hospital.totally-fake.net)\n"
+                f"- Clearly fake domain suited to the role (e.g. {rd['easy']})\n"
                 "- At least 2 obvious spelling/grammar mistakes in the body\n"
                 "- Aggressive ALL-CAPS urgency (ACT NOW! DEADLINE TODAY! ACCOUNT WILL BE CLOSED!)\n"
-                "- Generic greeting only: 'Dear Staff' or 'Dear User' — never use recipient name\n"
-                "- Blatantly suspicious request (share password, enter full credentials)"
+                "- Generic greeting only: 'Dear Staff' or 'Dear Team' — NEVER use name\n"
+                "- Blatantly suspicious request (share password, enter full credentials)\n"
+                "- Sender address obviously fake"
             ),
             "medium": (
                 "INTERMEDIATE difficulty — some flags obvious, some need careful reading:\n"
-                "- Slightly suspicious domain (e.g. hospital-hr-portal.net, moh-notifications.com)\n"
-                "- Mostly professional tone with 1-2 red flags in wording\n"
-                "- One minor spelling error or awkward sentence\n"
-                "- Moderate urgency with a deadline ('Please respond by end of week')\n"
-                "- Semi-personal greeting — correct title but name slightly wrong or generic"
+                f"- Slightly suspicious domain suited to role (e.g. {rd['medium']})\n"
+                "- Mostly professional tone with 1-2 red flags only\n"
+                "- EXACTLY 1 minor spelling mistake — just one subtle error\n"
+                "- Moderate urgency only: 'Please respond by end of week' — NO ALL-CAPS\n"
+                "- Semi-personal greeting matching role (correct title, name slightly off)\n"
+                "- Request unusual but not impossible in workplace context"
             ),
             "hard": (
-                "ADVANCED difficulty — red flags extremely subtle, email looks almost completely legitimate:\n"
-                "- Nearly real domain with only one tiny character change (e.g. hosp1tal.org, hospital-sa.net)\n"
-                "- Perfect professional English, zero spelling or grammar errors\n"
-                "- Subtle polite urgency only ('Kindly review before end of business day')\n"
-                "- Personalised greeting with full name and exact job title\n"
-                "- Only ONE subtle red flag — everything else looks completely legitimate"
+                "ADVANCED difficulty — red flags extremely subtle, email looks almost completely real:\n"
+                f"- Nearly real domain with ONE tiny change suited to role (e.g. {rd['hard']})\n"
+                "- ZERO spelling or grammar mistakes — perfect professional language\n"
+                "- ZERO ALL-CAPS — completely normal professional tone throughout\n"
+                "- Subtle polite urgency only: 'Kindly review before end of business day'\n"
+                "- Full name + exact job title matching the role in greeting\n"
+                "- ONLY ONE subtle red flag (the domain) — everything else perfectly legitimate"
             ),
         }
-        lang_rule = "English only throughout. Email addresses and URLs stay Latin."
-        task_p = f"Generate a realistic phishing email targeting {r_desc}. Freely choose any attack type from this context: {r_ctx}. Be creative and varied."
-        task_l = f"Generate a realistic legitimate workplace email for {r_desc}. Use official domain (@hospital.org or @moh.gov.sa). Zero suspicious elements — must look completely normal."
-        expl   = f"Clearly explain why this email is {'phishing — identify all the red flags that give it away' if is_phishing else 'legitimate and safe — explain what makes it trustworthy'}"
-        from_ex, subj_ex, body_ex = "Sender Name <email@domain.com>", "subject line", "email body in English"
-
     diff_rule = diff_rules.get(difficulty, diff_rules["medium"])
     task = task_p if is_phishing else task_l
 
     # FIX 7b: Forced scenario for assessment based on index + is_phishing
+    # ══════════════════════════════════════════════
+    # ASSESSMENT SCENARIOS — مخصصة لكل دور مع تنويع
+    # ══════════════════════════════════════════════
     assess_scenarios = {
         "admin": {
-            True: [  # phishing scenarios
-                "MANDATORY: Fake supplier invoice for medical equipment — urgent payment request SAR 150,000. Use PDF attachment.",
-                "MANDATORY: Fake health insurance portal — re-verify coverage details via suspicious link.",
-                "MANDATORY: Fake payroll system — update bank account details urgently.",
-                "MANDATORY: CEO impersonation — urgent financial transfer request. Pure social engineering.",
-                "MANDATORY: Fake MOH accreditation document portal — upload compliance files via suspicious link.",
+            True: [
+                "MANDATORY PHISHING — Admin/Billing: Fake supplier invoice for medical equipment. Vary: supplier name (MedSupply Co./Gulf Medical/Al-Rashid Medical), equipment type (surgical instruments/lab supplies/radiology equipment/ICU monitors), invoice amount (SAR 75,000–200,000), PDF filename. Target: billing or procurement admin.",
+                "MANDATORY PHISHING — Admin/Insurance: Fake health insurance portal — re-verify staff coverage. Vary: provider name (Tawuniya/Bupa Arabia/MedGulf/AXA), claim type (annual renewal/coverage update/reimbursement), suspicious link URL. Target: insurance coordinator.",
+                "MANDATORY PHISHING — Admin/HR: Fake payroll system — salary on hold until bank details updated. Vary: bank detail type (IBAN/account number/branch code), deadline (end of month/within 48h/before 15th), sender name. Target: HR or billing staff.",
+                "MANDATORY PHISHING — Admin/Executive: Hospital CEO or Director impersonation — urgent financial transfer or sensitive payroll data request. Vary: director name, amount, urgency reason. Pure social engineering, no link needed. Target: admin manager.",
+                "MANDATORY PHISHING — Admin/Procurement: Fake medical procurement portal — supplier contract must be renewed via suspicious link. Vary: supplier type, contract value, deadline, suspicious URL. Target: procurement officer.",
             ],
-            False: [  # legitimate scenarios
-                "MANDATORY: Legitimate reminder about weekly patient appointment schedule. From official hospital.org domain.",
-                "MANDATORY: Legitimate HR notice about upcoming staff training session. From official hospital.org domain.",
-                "MANDATORY: Legitimate procurement update about approved medical supply order. From official hospital.org domain.",
-                "MANDATORY: Legitimate payslip notification from official HR system. From official hospital.org domain.",
-                "MANDATORY: Legitimate department meeting invitation from manager. From official hospital.org domain.",
+            False: [
+                "MANDATORY LEGITIMATE — Admin: Routine weekly patient appointment schedule reminder from department head. Official @hospital.org sender. No links, no requests, no urgency.",
+                "MANDATORY LEGITIMATE — Admin/HR: Upcoming mandatory staff training notice (fire safety/CPR/MOH compliance). Official @hospital.org sender. Informational only.",
+                "MANDATORY LEGITIMATE — Admin/Procurement: Approved medical supply order confirmed and dispatched. Official @hospital.org sender. No suspicious links.",
+                "MANDATORY LEGITIMATE — Admin/Payroll: Monthly payslip notification from official HR system. Official @hospital.org sender. Standard routine notification.",
+                "MANDATORY LEGITIMATE — Admin: Departmental meeting invitation from manager about next week. Official @hospital.org sender. Normal business communication.",
             ],
         },
         "clinical": {
             True: [
-                "MANDATORY: Fake EMR login credential harvest via suspicious link.",
-                "MANDATORY: Fake patient lab results as malicious PDF attachment.",
-                "MANDATORY: Fake MOH clinical alert requiring immediate link click.",
-                "MANDATORY: Medical director impersonation requesting patient data.",
-                "MANDATORY: Fake clinical schedule as malicious Excel attachment.",
+                "MANDATORY PHISHING — Clinical/EMR: Fake EMR credential harvest. Vary: system name (EMR/Patient Portal/Clinical System/HealthRecord), suspicious link URL, ONE spelling mistake (credintials OR urgant OR acces OR imediatly — never use recived). Address to Dr. or Nurse.",
+                "MANDATORY PHISHING — Clinical/PDF: Malicious patient lab results PDF. Vary: patient department (ICU/oncology/cardiology/radiology/pediatrics), patient case reference, PDF filename (patient_results_XXXX.pdf), doctor name. Include one spelling mistake.",
+                "MANDATORY PHISHING — Clinical/MOH: Fake MOH clinical protocol requiring immediate link click. Vary: protocol topic (infection control/COVID update/MRSA alert/vaccination/antimicrobial resistance), MOH official name, suspicious link URL.",
+                "MANDATORY PHISHING — Clinical/Impersonation: Medical director or chief of staff impersonation — urgent patient data or system credentials request. Vary: director name, specialty (Surgery/Internal Medicine/Emergency/Oncology), specific request. Pure social engineering.",
+                "MANDATORY PHISHING — Clinical/Excel: Malicious clinical duty roster Excel. Vary: schedule period (next month/Ramadan/Q2/holiday coverage), head nurse name, Excel filename. Request to enable macros.",
             ],
             False: [
-                "MANDATORY: Legitimate shift schedule update from head nurse. Official hospital.org domain.",
-                "MANDATORY: Legitimate patient case review reminder. Official hospital.org domain.",
-                "MANDATORY: Legitimate MOH training reminder. Official moh.gov.sa domain.",
-                "MANDATORY: Legitimate infection control policy update. Official hospital.org domain.",
-                "MANDATORY: Legitimate department meeting from medical director. Official hospital.org domain.",
+                "MANDATORY LEGITIMATE — Clinical: Next week shift schedule update from head nurse. Official @hospital.org sender. No links, no requests. Normal clinical communication.",
+                "MANDATORY LEGITIMATE — Clinical: Patient case review reminder for ward round or MDT meeting. Official @hospital.org sender. Routine clinical workflow, no suspicious elements.",
+                "MANDATORY LEGITIMATE — Clinical/MOH: MOH mandatory training reminder (CPD/BLS/infection control). Official @moh.gov.sa or @hospital.org sender. Informational only.",
+                "MANDATORY LEGITIMATE — Clinical: Updated infection control guidelines from infection control team. Official @hospital.org sender. Policy update only, no links.",
+                "MANDATORY LEGITIMATE — Clinical: Department meeting invitation from medical director about clinical protocols. Official @hospital.org sender. Normal professional communication.",
             ],
         },
         "it": {
             True: [
-                "MANDATORY: Fake VPN credential update via suspicious portal.",
-                "MANDATORY: Fake SSL certificate expiry requiring immediate action.",
-                "MANDATORY: Fake IT helpdesk requesting remote access credentials.",
-                "MANDATORY: CIO impersonation requesting server credentials.",
-                "MANDATORY: Fake software license renewal via suspicious link.",
+                "MANDATORY PHISHING — IT/VPN: Fake VPN re-authentication alert. Vary: VPN name (Cisco AnyConnect/FortiClient/Pulse Secure/GlobalProtect), suspicious portal URL, urgency reason (security update/certificate renewal/mandatory re-auth). Target: IT specialist.",
+                "MANDATORY PHISHING — IT/SSL: Fake SSL certificate expiry for hospital system. Vary: affected system (hospital website/patient portal/EMR login/staff intranet/lab system), renewal deadline, suspicious link URL. Target: system administrator.",
+                "MANDATORY PHISHING — IT/Helpdesk: Fake helpdesk ticket requesting remote access or credentials. Vary: ticket reference number, reported issue (server outage/network fault/EMR performance), requester name. Target: IT helpdesk staff.",
+                "MANDATORY PHISHING — IT/CIO: CIO or CISO impersonation — urgent server credentials or disable security settings. Vary: executive name, specific system (firewall/server/database), urgency reason. Pure social engineering. Target: IT specialist.",
+                "MANDATORY PHISHING — IT/License: Fake software license renewal portal. Vary: software name (antivirus/EMR/Windows Server/database license), expiry urgency (24h/end of day/this week), suspicious renewal URL. Target: IT admin.",
             ],
             False: [
-                "MANDATORY: Legitimate scheduled server maintenance notice. Official hospital.org domain.",
-                "MANDATORY: Legitimate software update announcement from IT department. Official hospital.org domain.",
-                "MANDATORY: Legitimate network monitoring alert from official system. Official hospital.org domain.",
-                "MANDATORY: Legitimate IT helpdesk ticket resolution. Official hospital.org domain.",
-                "MANDATORY: Legitimate cybersecurity training reminder. Official hospital.org domain.",
+                "MANDATORY LEGITIMATE — IT: Scheduled server maintenance notice for next weekend. Official @hospital.org sender. Informational only, no credentials needed.",
+                "MANDATORY LEGITIMATE — IT: Software update announcement for hospital systems (antivirus/Windows/EMR patch). Official @hospital.org sender. Standard IT notification.",
+                "MANDATORY LEGITIMATE — IT: Network upgrade scheduled notification from IT department. Official @hospital.org sender. Informational, no action required.",
+                "MANDATORY LEGITIMATE — IT/Helpdesk: IT helpdesk ticket resolution confirmation — issue resolved. Official @hospital.org sender. Closing notification only.",
+                "MANDATORY LEGITIMATE — IT: Cybersecurity awareness training reminder for IT staff. Official @hospital.org or @moh.gov.sa sender. Training schedule only.",
             ],
         },
         "other": {
             True: [
-                "MANDATORY (Admin type): Fake supplier invoice — urgent medical equipment payment request. Use PDF attachment.",
-                "MANDATORY (Clinical type): Fake EMR system login — credential harvest via suspicious portal link.",
-                "MANDATORY (IT type): Fake hospital network security alert — urgent credential update required.",
-                "MANDATORY (Admin type): Fake payroll notification — salary on hold until bank details updated.",
-                "MANDATORY (Clinical type): Fake MOH health directive — urgent acknowledgment required via link.",
+                "MANDATORY PHISHING — Mixed/Admin: Fake supplier invoice for medical equipment — urgent payment request. Vary: supplier name, equipment type, invoice amount (SAR 50,000–150,000), PDF filename. Target: general hospital employee.",
+                "MANDATORY PHISHING — Mixed/Clinical: Fake hospital system login credential harvest. Vary: system name (EMR/staff portal/scheduling system), suspicious URL, ONE spelling mistake. Target: general hospital employee.",
+                "MANDATORY PHISHING — Mixed/IT: Fake hospital network or cybersecurity alert — urgent credential update. Vary: alert type (security breach/VPN expiry/account lockout), suspicious portal URL. Target: general hospital employee.",
+                "MANDATORY PHISHING — Mixed/Admin: Fake payroll notification — salary on hold until bank details updated. Vary: bank detail type, urgency deadline, sender name. Target: general hospital employee.",
+                "MANDATORY PHISHING — Mixed/Clinical: Fake MOH health directive — immediate acknowledgment via link. Vary: directive topic (vaccination/safety/compliance), MOH official name, suspicious URL. Target: general hospital employee.",
             ],
             False: [
-                "MANDATORY: Legitimate weekly schedule update from department head. Official hospital.org domain. No suspicious elements.",
-                "MANDATORY: Legitimate HR training reminder for all staff. Official hospital.org domain. No links or requests.",
-                "MANDATORY: Legitimate hospital policy update notice. Official hospital.org domain. No credential requests.",
-                "MANDATORY: Legitimate payslip notification from HR system. Official hospital.org domain. Routine notification.",
-                "MANDATORY: Legitimate departmental meeting invitation from manager. Official hospital.org domain. Normal business communication.",
+                "MANDATORY LEGITIMATE — Mixed: Routine weekly work schedule update from department head. Official @hospital.org sender. No suspicious elements.",
+                "MANDATORY LEGITIMATE — Mixed/HR: Staff training reminder from HR (safety/compliance/professional development). Official @hospital.org sender. Informational only.",
+                "MANDATORY LEGITIMATE — Mixed: Hospital policy update notice from administration. Official @hospital.org sender. No links, no requests.",
+                "MANDATORY LEGITIMATE — Mixed/Payroll: Monthly payslip notification from official HR system. Official @hospital.org sender. Standard notification.",
+                "MANDATORY LEGITIMATE — Mixed: Team meeting or briefing invitation from manager. Official @hospital.org sender. Normal workplace communication.",
             ],
         },
     }
@@ -638,99 +656,110 @@ def build_assess_prompt(role, index, is_phishing, language):
 
     # FIX 9: ترجمة forced_task حسب اللغة
     ASSESS_TRANSLATIONS = {
-        # Admin phishing
-        "MANDATORY: Fake supplier invoice for medical equipment — urgent payment request SAR 150,000. Use PDF attachment.":
-            "إجباري: فاتورة مورد معدات طبية مزيفة — طلب دفع عاجل 150,000 ريال. استخدم مرفق PDF.",
-        "MANDATORY: Fake health insurance portal — re-verify coverage details via suspicious link.":
-            "إجباري: بوابة تأمين صحي مزيفة — إعادة التحقق من بيانات التغطية عبر رابط مشبوه.",
-        "MANDATORY: Fake payroll system — update bank account details urgently.":
-            "إجباري: نظام رواتب مزيف — تحديث بيانات الحساب البنكي بشكل عاجل.",
-        "MANDATORY: CEO impersonation — urgent financial transfer request. Pure social engineering.":
-            "إجباري: انتحال هوية المدير التنفيذي — طلب تحويل مالي عاجل. هندسة اجتماعية.",
-        "MANDATORY: Fake MOH accreditation document portal — upload compliance files via suspicious link.":
-            "إجباري: بوابة اعتماد MOH مزيفة — رفع مستندات الامتثال عبر رابط مشبوه.",
-        # Admin legit
-        "MANDATORY: Legitimate reminder about weekly patient appointment schedule. From official hospital.org domain.":
-            "إجباري: تذكير شرعي بجدول مواعيد المرضى الأسبوعي. من نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate HR notice about upcoming staff training session. From official hospital.org domain.":
-            "إجباري: إشعار موارد بشرية شرعي بجلسة تدريبية قادمة. من نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate procurement update about approved medical supply order. From official hospital.org domain.":
-            "إجباري: تحديث مشتريات شرعي لطلب توريد طبي معتمد. من نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate payslip notification from official HR system. From official hospital.org domain.":
-            "إجباري: إشعار راتب شرعي من نظام الموارد البشرية الرسمي. من نطاق hospital.org.",
-        "MANDATORY: Legitimate department meeting invitation from manager. From official hospital.org domain.":
-            "إجباري: دعوة اجتماع قسم شرعية من المدير. من نطاق hospital.org الرسمي.",
-        # Clinical phishing
-        "MANDATORY: Fake EMR login credential harvest via suspicious link.":
-            "إجباري: سرقة بيانات دخول نظام السجلات الطبية عبر رابط مشبوه.",
-        "MANDATORY: Fake patient lab results as malicious PDF attachment.":
-            "إجباري: نتائج مختبر مرضى مزيفة كمرفق PDF خبيث.",
-        "MANDATORY: Fake MOH clinical alert requiring immediate link click.":
-            "إجباري: تنبيه سريري مزيف من وزارة الصحة يتطلب نقر رابط فوري.",
-        "MANDATORY: Medical director impersonation requesting patient data.":
-            "إجباري: انتحال هوية المدير الطبي يطلب بيانات المرضى.",
-        "MANDATORY: Fake clinical schedule as malicious Excel attachment.":
-            "إجباري: جدول مناوبات سريري مزيف كمرفق Excel خبيث.",
-        # Clinical legit
-        "MANDATORY: Legitimate shift schedule update from head nurse. Official hospital.org domain.":
-            "إجباري: تحديث جدول المناوبة شرعي من رئيسة التمريض. نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate patient case review reminder. Official hospital.org domain.":
-            "إجباري: تذكير شرعي بمراجعة حالة مريض. نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate MOH training reminder. Official moh.gov.sa domain.":
-            "إجباري: تذكير تدريب شرعي من وزارة الصحة. نطاق moh.gov.sa الرسمي.",
-        "MANDATORY: Legitimate infection control policy update. Official hospital.org domain.":
-            "إجباري: تحديث سياسة مكافحة العدوى شرعي. نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate department meeting from medical director. Official hospital.org domain.":
-            "إجباري: اجتماع قسم شرعي من المدير الطبي. نطاق hospital.org الرسمي.",
-        # IT phishing
-        "MANDATORY: Fake VPN credential update via suspicious portal.":
-            "إجباري: تحديث بيانات VPN مزيف عبر بوابة مشبوهة.",
-        "MANDATORY: Fake SSL certificate expiry requiring immediate action.":
-            "إجباري: تنبيه انتهاء شهادة SSL مزيف يتطلب إجراءً فورياً.",
-        "MANDATORY: Fake IT helpdesk requesting remote access credentials.":
-            "إجباري: مكتب مساعدة IT مزيف يطلب بيانات الوصول عن بُعد.",
-        "MANDATORY: CIO impersonation requesting server credentials.":
-            "إجباري: انتحال هوية مدير تقنية المعلومات يطلب بيانات الخادم.",
-        "MANDATORY: Fake software license renewal via suspicious link.":
-            "إجباري: تجديد ترخيص برنامج مزيف عبر رابط مشبوه.",
-        # IT legit
-        "MANDATORY: Legitimate scheduled server maintenance notice. Official hospital.org domain.":
-            "إجباري: إشعار صيانة خادم مجدولة شرعي. نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate software update announcement from IT department. Official hospital.org domain.":
-            "إجباري: إعلان تحديث برنامج شرعي من قسم تقنية المعلومات. نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate network monitoring alert from official system. Official hospital.org domain.":
-            "إجباري: تنبيه مراقبة شبكة شرعي من النظام الرسمي. نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate IT helpdesk ticket resolution. Official hospital.org domain.":
-            "إجباري: حل تذكرة مكتب المساعدة شرعي. نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate cybersecurity training reminder. Official hospital.org domain.":
-            "إجباري: تذكير تدريب الأمن السيبراني شرعي. نطاق hospital.org الرسمي.",
-        # Other phishing
-        "MANDATORY (Admin type): Fake supplier invoice — urgent medical equipment payment request. Use PDF attachment.":
-            "إجباري (إداري): فاتورة مورد مزيفة — طلب دفع عاجل لمعدات طبية. مرفق PDF.",
-        "MANDATORY (Clinical type): Fake EMR system login — credential harvest via suspicious portal link.":
-            "إجباري (سريري): دخول مزيف لنظام السجلات الطبية — سرقة بيانات عبر رابط مشبوه.",
-        "MANDATORY (IT type): Fake hospital network security alert — urgent credential update required.":
-            "إجباري (تقني): تنبيه أمني مزيف للشبكة — تحديث بيانات الدخول عاجل.",
-        "MANDATORY (Admin type): Fake payroll notification — salary on hold until bank details updated.":
-            "إجباري (إداري): إشعار راتب مزيف — الراتب موقوف حتى تحديث بيانات الحساب البنكي.",
-        "MANDATORY (Clinical type): Fake MOH health directive — urgent acknowledgment required via link.":
-            "إجباري (سريري): توجيه صحي مزيف من وزارة الصحة — تأكيد عاجل عبر رابط.",
-        # Other legit
-        "MANDATORY: Legitimate weekly schedule update from department head. Official hospital.org domain. No suspicious elements.":
-            "إجباري: تحديث جدول أسبوعي شرعي من رئيس القسم. نطاق hospital.org الرسمي. لا عناصر مشبوهة.",
-        "MANDATORY: Legitimate HR training reminder for all staff. Official hospital.org domain. No links or requests.":
-            "إجباري: تذكير تدريب موارد بشرية شرعي لجميع الموظفين. نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate hospital policy update notice. Official hospital.org domain. No credential requests.":
-            "إجباري: إشعار تحديث سياسة المستشفى الشرعي. نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate payslip notification from HR system. Official hospital.org domain. Routine notification.":
-            "إجباري: إشعار راتب شرعي من نظام الموارد البشرية. نطاق hospital.org الرسمي.",
-        "MANDATORY: Legitimate departmental meeting invitation from manager. Official hospital.org domain. Normal business communication.":
-            "إجباري: دعوة اجتماع قسم شرعية من المدير. نطاق hospital.org الرسمي.",
+        # ── Admin phishing ──────────────────────────────────────
+        "MANDATORY PHISHING — Admin/Billing: Fake supplier invoice for medical equipment. Vary: supplier name (MedSupply Co./Gulf Medical/Al-Rashid Medical), equipment type (surgical instruments/lab supplies/radiology equipment/ICU monitors), invoice amount (SAR 75,000–200,000), PDF filename. Target: billing or procurement admin.":
+            "إجباري تصيد — إداري/فواتير: فاتورة مورد معدات طبية مزيفة. غيّر: اسم المورد (MedSupply/الخليج الطبي/الرشيد الطبي)، نوع المعدات (أجهزة جراحية/مستلزمات مختبر/أجهزة تصوير/أجهزة ICU)، المبلغ (75,000–200,000 ريال)، اسم ملف PDF. الهدف: موظف فوترة أو مشتريات.",
+        "MANDATORY PHISHING — Admin/Insurance: Fake health insurance portal — re-verify staff coverage. Vary: provider name (Tawuniya/Bupa Arabia/MedGulf/AXA), claim type (annual renewal/coverage update/reimbursement), suspicious link URL. Target: insurance coordinator.":
+            "إجباري تصيد — إداري/تأمين: بوابة تأمين صحي مزيفة لإعادة التحقق من التغطية. غيّر: اسم شركة التأمين (التعاونية/بوبا/ميدغلف/AXA)، نوع الطلب (تجديد/تحديث تغطية/استرداد)، رابط مشبوه. الهدف: منسق تأمين.",
+        "MANDATORY PHISHING — Admin/HR: Fake payroll system — salary on hold until bank details updated. Vary: bank detail type (IBAN/account number/branch code), deadline (end of month/within 48h/before 15th), sender name. Target: HR or billing staff.":
+            "إجباري تصيد — إداري/رواتب: نظام رواتب مزيف — الراتب موقوف حتى تحديث البيانات البنكية. غيّر: نوع البيانات (IBAN/رقم الحساب/رمز الفرع)، الموعد النهائي (نهاية الشهر/48 ساعة/قبل الـ15)، اسم المرسل. الهدف: موظف HR أو فوترة.",
+        "MANDATORY PHISHING — Admin/Executive: Hospital CEO or Director impersonation — urgent financial transfer or sensitive payroll data request. Vary: director name, amount, urgency reason. Pure social engineering, no link needed. Target: admin manager.":
+            "إجباري تصيد — إداري/مدير: انتحال هوية المدير التنفيذي — طلب تحويل مالي عاجل أو بيانات رواتب حساسة. غيّر: اسم المدير، المبلغ، سبب الاستعجال. هندسة اجتماعية بحتة. الهدف: مدير إداري.",
+        "MANDATORY PHISHING — Admin/Procurement: Fake medical procurement portal — supplier contract must be renewed via suspicious link. Vary: supplier type, contract value, deadline, suspicious URL. Target: procurement officer.":
+            "إجباري تصيد — إداري/مشتريات: بوابة مشتريات طبية مزيفة — تجديد عقد مورد عبر رابط مشبوه. غيّر: نوع المورد، قيمة العقد، الموعد النهائي، الرابط المشبوه. الهدف: مسؤول مشتريات.",
+        # ── Admin legit ─────────────────────────────────────────
+        "MANDATORY LEGITIMATE — Admin: Routine weekly patient appointment schedule reminder from department head. Official @hospital.org sender. No links, no requests, no urgency.":
+            "إجباري شرعي — إداري: تذكير روتيني أسبوعي بجدول مواعيد المرضى من رئيس القسم. مرسل رسمي @hospital.org. بدون روابط أو طلبات.",
+        "MANDATORY LEGITIMATE — Admin/HR: Upcoming mandatory staff training notice (fire safety/CPR/MOH compliance). Official @hospital.org sender. Informational only.":
+            "إجباري شرعي — إداري/موارد بشرية: إشعار تدريب إلزامي قادم (سلامة/إسعافات/امتثال). مرسل رسمي @hospital.org. للإعلام فقط.",
+        "MANDATORY LEGITIMATE — Admin/Procurement: Approved medical supply order confirmed and dispatched. Official @hospital.org sender. No suspicious links.":
+            "إجباري شرعي — إداري/مشتريات: تأكيد اعتماد وشحن طلب توريد طبي. مرسل رسمي @hospital.org. بدون روابط مشبوهة.",
+        "MANDATORY LEGITIMATE — Admin/Payroll: Monthly payslip notification from official HR system. Official @hospital.org sender. Standard routine notification.":
+            "إجباري شرعي — إداري/رواتب: إشعار راتب شهري من نظام الموارد البشرية الرسمي. مرسل رسمي @hospital.org. إشعار روتيني عادي.",
+        "MANDATORY LEGITIMATE — Admin: Departmental meeting invitation from manager about next week. Official @hospital.org sender. Normal business communication.":
+            "إجباري شرعي — إداري: دعوة اجتماع قسم من المدير للأسبوع القادم. مرسل رسمي @hospital.org. تواصل عمل عادي.",
+        # ── Clinical phishing ───────────────────────────────────
+        "MANDATORY PHISHING — Clinical/EMR: Fake EMR credential harvest. Vary: system name (EMR/Patient Portal/Clinical System/HealthRecord), suspicious link URL, ONE spelling mistake (credintials OR urgant OR acces OR imediatly — never use recived). Address to Dr. or Nurse.":
+            "إجباري تصيد — سريري/EMR: سرقة بيانات نظام السجلات الطبية. غيّر: اسم النظام (EMR/بوابة المريض/النظام السريري)، الرابط المشبوه، خطأ إملائي واحد (اختر: تسجيـل/عاجلة/وصلت). خاطب الدكتور أو الممرض.",
+        "MANDATORY PHISHING — Clinical/PDF: Malicious patient lab results PDF. Vary: patient department (ICU/oncology/cardiology/radiology/pediatrics), patient case reference, PDF filename (patient_results_XXXX.pdf), doctor name. Include one spelling mistake.":
+            "إجباري تصيد — سريري/PDF: مرفق PDF خبيث لنتائج مختبر مريض. غيّر: القسم (ICU/أورام/قلب/أشعة/أطفال)، رقم الحالة، اسم ملف PDF، اسم الطبيب. ضمّن خطأً إملائياً واحداً.",
+        "MANDATORY PHISHING — Clinical/MOH: Fake MOH clinical protocol requiring immediate link click. Vary: protocol topic (infection control/COVID update/MRSA alert/vaccination/antimicrobial resistance), MOH official name, suspicious link URL.":
+            "إجباري تصيد — سريري/وزارة: بروتوكول سريري مزيف من وزارة الصحة يستلزم نقر رابط فوري. غيّر: موضوع البروتوكول (مكافحة عدوى/كوفيد/MRSA/تطعيمات)، اسم المسؤول، الرابط المشبوه.",
+        "MANDATORY PHISHING — Clinical/Impersonation: Medical director or chief of staff impersonation — urgent patient data or system credentials request. Vary: director name, specialty (Surgery/Internal Medicine/Emergency/Oncology), specific request. Pure social engineering.":
+            "إجباري تصيد — سريري/انتحال: انتحال هوية المدير الطبي — طلب عاجل لبيانات مرضى أو بيانات دخول الأنظمة. غيّر: اسم المدير، التخصص (جراحة/باطنية/طوارئ/أورام)، الطلب المحدد.",
+        "MANDATORY PHISHING — Clinical/Excel: Malicious clinical duty roster Excel. Vary: schedule period (next month/Ramadan/Q2/holiday coverage), head nurse name, Excel filename. Request to enable macros.":
+            "إجباري تصيد — سريري/Excel: جدول مناوبات سريري مزيف كملف Excel خبيث. غيّر: الفترة (رمضان/الربع الثاني/الإجازات)، اسم رئيسة التمريض، اسم الملف. اطلب تفعيل الماكرو.",
+        # ── Clinical legit ──────────────────────────────────────
+        "MANDATORY LEGITIMATE — Clinical: Next week shift schedule update from head nurse. Official @hospital.org sender. No links, no requests. Normal clinical communication.":
+            "إجباري شرعي — سريري: تحديث جدول المناوبة للأسبوع القادم من رئيسة التمريض. مرسل رسمي @hospital.org. بدون روابط أو طلبات.",
+        "MANDATORY LEGITIMATE — Clinical: Patient case review reminder for ward round or MDT meeting. Official @hospital.org sender. Routine clinical workflow, no suspicious elements.":
+            "إجباري شرعي — سريري: تذكير بمراجعة حالة مريض لجولة الزيارة أو اجتماع الفريق. مرسل رسمي @hospital.org. روتين سريري عادي.",
+        "MANDATORY LEGITIMATE — Clinical/MOH: MOH mandatory training reminder (CPD/BLS/infection control). Official @moh.gov.sa or @hospital.org sender. Informational only.":
+            "إجباري شرعي — سريري/وزارة: تذكير التدريب الإلزامي من وزارة الصحة (CPD/BLS/مكافحة عدوى). مرسل رسمي @moh.gov.sa. للإعلام فقط.",
+        "MANDATORY LEGITIMATE — Clinical: Updated infection control guidelines from infection control team. Official @hospital.org sender. Policy update only, no links.":
+            "إجباري شرعي — سريري: تحديث إرشادات مكافحة العدوى من الفريق المختص. مرسل رسمي @hospital.org. تحديث سياسة فقط.",
+        "MANDATORY LEGITIMATE — Clinical: Department meeting invitation from medical director about clinical protocols. Official @hospital.org sender. Normal professional communication.":
+            "إجباري شرعي — سريري: دعوة اجتماع قسم من المدير الطبي لمناقشة البروتوكولات. مرسل رسمي @hospital.org. تواصل مهني عادي.",
+        # ── IT phishing ─────────────────────────────────────────
+        "MANDATORY PHISHING — IT/VPN: Fake VPN re-authentication alert. Vary: VPN name (Cisco AnyConnect/FortiClient/Pulse Secure/GlobalProtect), suspicious portal URL, urgency reason (security update/certificate renewal/mandatory re-auth). Target: IT specialist.":
+            "إجباري تصيد — تقني/VPN: تنبيه إعادة مصادقة VPN مزيف. غيّر: اسم الـ VPN (Cisco AnyConnect/FortiClient/Pulse Secure)، الرابط المشبوه، سبب الاستعجال. الهدف: متخصص تقنية معلومات.",
+        "MANDATORY PHISHING — IT/SSL: Fake SSL certificate expiry for hospital system. Vary: affected system (hospital website/patient portal/EMR login/staff intranet/lab system), renewal deadline, suspicious link URL. Target: system administrator.":
+            "إجباري تصيد — تقني/SSL: انتهاء شهادة SSL مزيف لنظام المستشفى. غيّر: النظام المتأثر (الموقع/بوابة المريض/EMR/الإنترانت)، الموعد النهائي، الرابط المشبوه. الهدف: مدير النظام.",
+        "MANDATORY PHISHING — IT/Helpdesk: Fake helpdesk ticket requesting remote access or credentials. Vary: ticket reference number, reported issue (server outage/network fault/EMR performance), requester name. Target: IT helpdesk staff.":
+            "إجباري تصيد — تقني/مكتب المساعدة: تذكرة مكتب مساعدة مزيفة تطلب وصولاً عن بُعد أو بيانات دخول. غيّر: رقم التذكرة، المشكلة المُبلَّغة (انقطاع الخادم/عطل الشبكة/أداء EMR)، اسم مقدم الطلب.",
+        "MANDATORY PHISHING — IT/CIO: CIO or CISO impersonation — urgent server credentials or disable security settings. Vary: executive name, specific system (firewall/server/database), urgency reason. Pure social engineering. Target: IT specialist.":
+            "إجباري تصيد — تقني/مدير: انتحال هوية مدير تقنية المعلومات — بيانات خادم عاجلة أو تعطيل إعدادات أمان. غيّر: اسم المدير، النظام المحدد (جدار ناري/خادم/قاعدة بيانات)، سبب الاستعجال.",
+        "MANDATORY PHISHING — IT/License: Fake software license renewal portal. Vary: software name (antivirus/EMR/Windows Server/database license), expiry urgency (24h/end of day/this week), suspicious renewal URL. Target: IT admin.":
+            "إجباري تصيد — تقني/ترخيص: بوابة تجديد ترخيص برنامج مزيفة. غيّر: اسم البرنامج (مضاد الفيروسات/EMR/Windows Server)، مدى الإلحاح (24 ساعة/نهاية اليوم/هذا الأسبوع)، الرابط المشبوه.",
+        # ── IT legit ────────────────────────────────────────────
+        "MANDATORY LEGITIMATE — IT: Scheduled server maintenance notice for next weekend. Official @hospital.org sender. Informational only, no credentials needed.":
+            "إجباري شرعي — تقني: إشعار صيانة خادم مجدولة للعطلة القادمة. مرسل رسمي @hospital.org. للإعلام فقط، لا حاجة لبيانات دخول.",
+        "MANDATORY LEGITIMATE — IT: Software update announcement for hospital systems (antivirus/Windows/EMR patch). Official @hospital.org sender. Standard IT notification.":
+            "إجباري شرعي — تقني: إعلان تحديث برنامج لأنظمة المستشفى (مضاد الفيروسات/ويندوز/تحديث EMR). مرسل رسمي @hospital.org. إشعار تقني عادي.",
+        "MANDATORY LEGITIMATE — IT: Network upgrade scheduled notification from IT department. Official @hospital.org sender. Informational, no action required.":
+            "إجباري شرعي — تقني: إشعار ترقية شبكة مجدولة من قسم تقنية المعلومات. مرسل رسمي @hospital.org. للإعلام فقط.",
+        "MANDATORY LEGITIMATE — IT/Helpdesk: IT helpdesk ticket resolution confirmation — issue resolved. Official @hospital.org sender. Closing notification only.":
+            "إجباري شرعي — تقني/مكتب المساعدة: تأكيد حل تذكرة مكتب المساعدة. مرسل رسمي @hospital.org. إشعار إغلاق فقط.",
+        "MANDATORY LEGITIMATE — IT: Cybersecurity awareness training reminder for IT staff. Official @hospital.org or @moh.gov.sa sender. Training schedule only.":
+            "إجباري شرعي — تقني: تذكير تدريب الوعي الأمني لموظفي تقنية المعلومات. مرسل رسمي @hospital.org. جدول تدريب فقط.",
+        # ── Other phishing ──────────────────────────────────────
+        "MANDATORY PHISHING — Mixed/Admin: Fake supplier invoice for medical equipment — urgent payment request. Vary: supplier name, equipment type, invoice amount (SAR 50,000–150,000), PDF filename. Target: general hospital employee.":
+            "إجباري تصيد — مختلط/إداري: فاتورة مورد طبية مزيفة — طلب دفع عاجل. غيّر: اسم المورد، نوع المعدات، المبلغ (50,000–150,000 ريال)، اسم PDF. الهدف: موظف عام.",
+        "MANDATORY PHISHING — Mixed/Clinical: Fake hospital system login credential harvest. Vary: system name (EMR/staff portal/scheduling system), suspicious URL, ONE spelling mistake. Target: general hospital employee.":
+            "إجباري تصيد — مختلط/سريري: سرقة بيانات دخول نظام المستشفى. غيّر: اسم النظام (EMR/بوابة الموظف/جدول المناوبات)، الرابط المشبوه، خطأ إملائي واحد. الهدف: موظف عام.",
+        "MANDATORY PHISHING — Mixed/IT: Fake hospital network or cybersecurity alert — urgent credential update. Vary: alert type (security breach/VPN expiry/account lockout), suspicious portal URL. Target: general hospital employee.":
+            "إجباري تصيد — مختلط/تقني: تنبيه أمني مزيف للشبكة — تحديث بيانات دخول عاجل. غيّر: نوع التنبيه (اختراق/انتهاء VPN/قفل الحساب)، الرابط المشبوه. الهدف: موظف عام.",
+        "MANDATORY PHISHING — Mixed/Admin: Fake payroll notification — salary on hold until bank details updated. Vary: bank detail type, urgency deadline, sender name. Target: general hospital employee.":
+            "إجباري تصيد — مختلط/إداري: إشعار راتب مزيف — موقوف حتى تحديث البيانات البنكية. غيّر: نوع البيانات البنكية، الموعد النهائي، اسم المرسل. الهدف: موظف عام.",
+        "MANDATORY PHISHING — Mixed/Clinical: Fake MOH health directive — immediate acknowledgment via link. Vary: directive topic (vaccination/safety/compliance), MOH official name, suspicious URL. Target: general hospital employee.":
+            "إجباري تصيد — مختلط/سريري: توجيه صحي مزيف من وزارة الصحة — تأكيد فوري عبر رابط. غيّر: موضوع التوجيه (تطعيمات/سلامة/امتثال)، اسم المسؤول، الرابط. الهدف: موظف عام.",
+        # ── Other legit ─────────────────────────────────────────
+        "MANDATORY LEGITIMATE — Mixed: Routine weekly work schedule update from department head. Official @hospital.org sender. No suspicious elements.":
+            "إجباري شرعي — مختلط: تحديث جدول عمل أسبوعي روتيني من رئيس القسم. مرسل رسمي @hospital.org. بدون عناصر مشبوهة.",
+        "MANDATORY LEGITIMATE — Mixed/HR: Staff training reminder from HR (safety/compliance/professional development). Official @hospital.org sender. Informational only.":
+            "إجباري شرعي — مختلط/HR: تذكير تدريب موظفين من الموارد البشرية (سلامة/امتثال/تطوير). مرسل رسمي @hospital.org. للإعلام فقط.",
+        "MANDATORY LEGITIMATE — Mixed: Hospital policy update notice from administration. Official @hospital.org sender. No links, no requests.":
+            "إجباري شرعي — مختلط: إشعار تحديث سياسة المستشفى من الإدارة. مرسل رسمي @hospital.org. بدون روابط أو طلبات.",
+        "MANDATORY LEGITIMATE — Mixed/Payroll: Monthly payslip notification from official HR system. Official @hospital.org sender. Standard notification.":
+            "إجباري شرعي — مختلط/رواتب: إشعار راتب شهري من نظام الموارد البشرية الرسمي. مرسل رسمي @hospital.org. إشعار عادي.",
+        "MANDATORY LEGITIMATE — Mixed: Team meeting or briefing invitation from manager. Official @hospital.org sender. Normal workplace communication.":
+            "إجباري شرعي — مختلط: دعوة اجتماع فريق أو إحاطة من المدير. مرسل رسمي @hospital.org. تواصل عمل عادي.",
     }
     if is_ar:
         forced_task = ASSESS_TRANSLATIONS.get(forced_task_raw, forced_task_raw)
     else:
         forced_task = forced_task_raw
+
+    # FIX 10: lang_rule مطابق للتعلم
+    if is_ar:
+        lang_rule = (
+            "اللغة: عربية فصحى فقط في كل النصوص (subject/body/explanation).\n"
+            "استثناء: عناوين البريد الإلكتروني والروابط (http://...) تبقى لاتينية.\n"
+            "ممنوع: أي حرف لاتيني داخل النصوص العربية.\n"
+            "حقل 'to': البريد الإلكتروني فقط بدون أي نص."
+        )
+    else:
+        lang_rule = "Language: English only throughout. No Arabic or foreign characters in text fields. Email addresses and URLs stay Latin."
 
     return f"""Phishing awareness assessment email for Saudi healthcare. Seed:{session_seed}
 
