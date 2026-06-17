@@ -482,8 +482,52 @@ FORMAT: body=plain text only, \\n for line breaks, no HTML. "to"=email address o
 RETURN ONLY VALID JSON:
 {{"is_phishing":{"true" if is_phishing else "false"},"from":"{from_ex}","to":"employee@hospital.org","subject":"{subj_ex}","attachment":"","body":"{body_ex}","suspicious_link":"","explanation":"{expl}"}}"""
 
+def get_system_prompt():
+    """
+    FIX 4: System prompt منفصل يُقيّد النموذج بصرامة حسب الصعوبة.
+    يُضاف كـ system message في كل API call لضمان الالتزام بالمستوى.
+    """
+    difficulty = st.session_state.get("difficulty", "medium")
+    sys_prompts = {
+        "easy": (
+            "You are a cybersecurity trainer generating phishing email examples. "
+            "EASY level RULES — you MUST follow ALL of these strictly:\n"
+            "1. Use a CLEARLY FAKE domain (e.g. hosp1tal-updates.xyz, hospital-secure.net, moh-alert.xyz)\n"
+            "2. Include EXACTLY 2 obvious spelling mistakes in the body (e.g. 'clic' instead of 'click', 'acess' instead of 'access')\n"
+            "3. Use ALL-CAPS for at least 2 sentences to show aggressive urgency\n"
+            "4. Use ONLY generic greeting: 'Dear Staff' — NEVER use a name\n"
+            "5. Make an obviously suspicious request (share password, enter full credentials)\n"
+            "These rules are NON-NEGOTIABLE for EASY difficulty."
+        ),
+        "medium": (
+            "You are a cybersecurity trainer generating phishing email examples. "
+            "MEDIUM level RULES — you MUST follow ALL of these strictly:\n"
+            "1. Use a slightly suspicious domain that looks almost real (e.g. hospital-hr-portal.net, moh-staff-portal.com) — NOT obviously fake\n"
+            "2. Include EXACTLY 1 minor spelling mistake in the body — just one subtle error\n"
+            "3. Use normal sentence case — NO ALL-CAPS sentences at all\n"
+            "4. Show moderate urgency with a deadline like 'Please respond by end of week' — NOT threatening language\n"
+            "5. Use semi-personal greeting with job title but wrong/generic name (e.g. 'Dear Dr. Ahmed')\n"
+            "6. Make a request that is unusual but not impossible in a workplace\n"
+            "These rules are NON-NEGOTIABLE for MEDIUM difficulty. Do NOT use ALL-CAPS urgency."
+        ),
+        "hard": (
+            "You are a cybersecurity trainer generating phishing email examples. "
+            "HARD level RULES — you MUST follow ALL of these strictly:\n"
+            "1. Use a domain that looks almost identical to the real one with ONE tiny change (e.g. hosp1tal.org, hospital-sa.net, moh.gov-sa.com)\n"
+            "2. ZERO spelling or grammar mistakes — perfect professional language\n"
+            "3. ZERO ALL-CAPS — completely normal professional tone throughout\n"
+            "4. Use subtle polite urgency ONLY (e.g. 'Kindly review before end of business day')\n"
+            "5. Use full name and exact job title in greeting (e.g. 'Dear Dr. Sarah Al-Mutairi,')\n"
+            "6. Include ONLY ONE subtle red flag — everything else must look completely legitimate\n"
+            "These rules are NON-NEGOTIABLE for HARD difficulty. The email must look almost real."
+        ),
+    }
+    return sys_prompts.get(difficulty, sys_prompts["medium"])
+
+
 def call_ai(prompt, max_tokens=1600):
     provider = st.session_state.get("ai_provider", "groq")
+    system_prompt = get_system_prompt()  # FIX 4: system prompt
 
     def get_secret(key):
         try:
@@ -503,7 +547,10 @@ def call_ai(prompt, max_tokens=1600):
                 "model":       "llama-3.3-70b-versatile",  # ← FIX 1: upgraded from 8b to 70b
                 "max_tokens":  max_tokens,
                 "temperature": 0.85,
-                "messages":    [{"role": "user", "content": prompt}]
+                "messages":    [
+                    {"role": "system", "content": system_prompt},  # FIX 4: system msg
+                    {"role": "user",   "content": prompt}
+                ]
             },
             timeout=45
         )
@@ -521,7 +568,10 @@ def call_ai(prompt, max_tokens=1600):
                 "model":       "gpt-4o",
                 "max_tokens":  max_tokens,
                 "temperature": 0.85,
-                "messages":    [{"role": "user", "content": prompt}]
+                "messages":    [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": prompt}
+                ]
             },
             timeout=60
         )
@@ -538,6 +588,7 @@ def call_ai(prompt, max_tokens=1600):
             json={
                 "model":      "claude-sonnet-4-6",
                 "max_tokens": max_tokens,
+                "system":     system_prompt,
                 "messages":   [{"role": "user", "content": prompt}]
             },
             timeout=60
