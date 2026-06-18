@@ -201,16 +201,226 @@ EN_NAMES = {
     ],
 }
 
+
+# ══════════════════════════════════════════════════════════════
+# STATIC TEMPLATES للـ Other Role
+# 6 إيميلات جاهزة: 2 Admin + 2 IT + 2 Clinical
+# اللـ LLM يولّد فقط الـ AI Analysis
+# ══════════════════════════════════════════════════════════════
+OTHER_TEMPLATES = [
+    # 0 — ADMIN: رواتب
+    {
+        "type": "admin",
+        "email": {
+            "email_type": "Payroll Phishing",
+            "from": "HR Department <noreply@hospital-hr-portal.xyz>",
+            "to": "m.sultan.alghamdi@hospital.org",
+            "subject": "URGENT: Your Salary Payment On Hold — Update Required",
+            "attachment": "",
+            "body": "Dear Staff,\n\nThis is an urgent notice from the HR Department regarding your monthly salary payment.\n\nDue to a recent banking system migration, we require all employees to re-verify their bank account details (IBAN) to ensure uninterrupted salary disbursement.\n\nYour salary payment for this month is currently ON HOLD and will not be processed until you complete the verification.\n\nPLEASE CLICK THE LINK BELOW TO UPDATE YOUR BANK DETIALS IMEDIATLY:\nhttps://hospital-salary-update.xyz/verify-iban\n\nFAILURE TO COMPLETE THIS PROCESS BEFORE END OF BUSINESS TODAY WILL RESULT IN YOUR SALARY BEING DELAYED BY 30 DAYS.\n\nBest regards,\nMohammed Al-Zahrani\nHR Manager\nnoreply@hospital-hr-portal.xyz",
+            "suspicious_text": "PLEASE CLICK THE LINK BELOW TO UPDATE YOUR BANK DETIALS IMEDIATLY",
+            "suspicious_link": "https://hospital-salary-update.xyz/verify-iban"
+        }
+    },
+    # 1 — IT: Network Security
+    {
+        "type": "it",
+        "email": {
+            "email_type": "Network Credential Phishing",
+            "from": "IT Security Team <noreply@hospital-netsecure.xyz>",
+            "to": "t.bandar.althubaiti@hospital.org",
+            "subject": "URGENT: Suspicious Login Detected — Re-Verify Your Network Account NOW",
+            "attachment": "",
+            "body": "Dear Staff,\n\nOur security monitoring system has detected SUSPISIOUS LOGIN ACTIVITY on your hospital network account from an unrecognized device.\n\nTo protect the hospital network and patient data, your account has been TEMPORARILY SUSPENDED until you re-verify your identity.\n\nPLEASE RE-VERIFY YOUR ACCOUNT IMEDIATELY by clicking the link below:\nhttps://hospital-netsecure.xyz/account-verify\n\nEnter your full network credentials (username and password) to restore access.\n\nACT NOW! YOUR ACCOUNT WILL BE PERMANENTLY LOCKED IF YOU DO NOT VERIFY WITHIN THE NEXT 2 HOURS.\n\nSincerely,\nIT Security Team\nnoreply@hospital-netsecure.xyz",
+            "suspicious_text": "PLEASE RE-VERIFY YOUR ACCOUNT IMEDIATELY",
+            "suspicious_link": "https://hospital-netsecure.xyz/account-verify"
+        }
+    },
+    # 2 — CLINICAL: MOH Protocol
+    {
+        "type": "clinical",
+        "email": {
+            "email_type": "MOH Phishing",
+            "from": "MOH Clinical Alerts <noreply@moh-clinical-updates.net>",
+            "to": "dr.sarah.almutairi@hospital.org",
+            "subject": "URGENT: New MOH Infection Control Protocol — Mandatory Compliance Required",
+            "attachment": "",
+            "body": "Dear Staff,\n\nThe Ministry of Health has issued a CRITICAL new infection control protocol following reports of increased MRSA cases across Saudi hospitals.\n\nAll clinical staff are REQUIRED to review and confirm compliance with the new protocol BEFORE END OF TODAY.\n\nACT NOW! YOUR ACCOUNT WILL BE SUSPENDED IF YOU DO NOT COMPLY.\n\nPlease urgentley click the link below to access the new protocal and enter your credintials to confirm compliance:\nhttps://moh-protocol-update.totally-fake.net/mrsa\n\nFAILURE TO COMPLY WILL RESULT IN DISCIPLINARY ACTION AND ACCOUNT CLOSURE.\n\nBest regards,\nDr. Khalid Al-Otaibi\nMOH Clinical Protocols Team\nnoreply@moh-clinical-updates.net",
+            "suspicious_text": "click the link below to access the new protocal and enter your credintials",
+            "suspicious_link": "https://moh-protocol-update.totally-fake.net/mrsa"
+        }
+    },
+    # 3 — ADMIN: فاتورة مورد
+    {
+        "type": "admin",
+        "email": {
+            "email_type": "Invoice Fraud",
+            "from": "Gulf Medical Supplies <billing@gulf-med-supplies.xyz>",
+            "to": "m.reem.alsabiei@hospital.org",
+            "subject": "URGENT: Medical Equipment Invoice SAR 125,000 — Payment Required TODAY",
+            "attachment": "Medical_Invoice_GMS_2024.pdf",
+            "body": "Dear Staff,\n\nPlease find attached the invoice for the recent delivery of ICU monitoring equipment (Order #GMS-4521).\n\nTotal amount due: SAR 125,000\nPayment deadline: TODAY\n\nWE HAVE RECIVED NOTIFCATION that your payment is overdue. Failure to pay by end of business today will result in IMMEDIATE SUSPENSION of your supply contract and legal action.\n\nTo verify the invoice and process payment, please login to our supplier portal:\nhttps://pay.gulf-med-supplies.xyz/login?inv=GMS4521\n\nPlease enter your username and password to complete the payment process.\n\nBest regards,\nAhmed Al-Farsi\nBilling Department\nGulf Medical Supplies",
+            "suspicious_text": "WE HAVE RECIVED NOTIFCATION that your payment is overdue",
+            "suspicious_link": "https://pay.gulf-med-supplies.xyz/login?inv=GMS4521"
+        }
+    },
+    # 4 — IT: SSL Certificate
+    {
+        "type": "it",
+        "email": {
+            "email_type": "SSL Certificate Phishing",
+            "from": "IT Department <noreply@hospital-ssl-renewal.net>",
+            "to": "t.rania.almalki@hospital.org",
+            "subject": "CRITICAL: Staff Intranet SSL Certificate EXPIRED — Immediate Action Required",
+            "attachment": "",
+            "body": "Dear Staff,\n\nYour atention is requierd IMEDIATLY!\n\nOur IT Department has detected that the SSL certificate for the Hospital Staff Intranet has EXPIRED TODAY.\n\nAll staff access to the intranet will be TERMINATED unless the certificate is renewed within the next hour.\n\nPlease click the link below to renew your SSL certificate and re-enter your login credintials:\nhttps://hospital-ssl-renewal.net/renew-cert\n\nYou will need to provide your FULL CREDENTIALS including username and password to complete the renewal process.\n\nSINCERELY,\nIT Department\nnoreply@hospital-ssl-renewal.net",
+            "suspicious_text": "re-enter your login credintials",
+            "suspicious_link": "https://hospital-ssl-renewal.net/renew-cert"
+        }
+    },
+    # 5 — CLINICAL: EMR Credentials
+    {
+        "type": "clinical",
+        "email": {
+            "email_type": "EMR Credential Phishing",
+            "from": "EMR Support Team <support@hospital-emr-secure.xyz>",
+            "to": "n.noura.alshamri@hospital.org",
+            "subject": "URGENT: EMR System Migration — Re-Verify Your Login Credintials NOW",
+            "attachment": "",
+            "body": "Dear Staff,\n\nOUR EMR SYSTEM IS UNDERGOING CRITICAL MIGRATION AND YOUR LOGIN CREDINTIALS ARE NO LONGER VALID.\n\nYou must re-verify your account IMEDIATLY to maintain access to patient records.\n\nPLEASE CLICK THIS LINK TO UPDATE YOUR ACCOUNT:\nhttp://emr-secure-update.totally-fake.net/verify-now\n\nIF YOU DO NOT TAKE ACTION NOW, YOUR ACCOUNT WILL BE CLOSED AND YOU WILL NOT BE ABLE TO ACCESS ANY PATIENT RECORDS.\n\nACT NOW! DEADLINE TODAY! THESE CHANGES ARE URGANT.\n\nPLEASE ENTER YOUR FULL CREDENTIALS TO VERIFY YOUR ACCOUNT.\n\nSincerely,\nEMR Support Team\nsupport@hospital-emr-secure.xyz",
+            "suspicious_text": "PLEASE ENTER YOUR FULL CREDENTIALS TO VERIFY YOUR ACCOUNT",
+            "suspicious_link": "http://emr-secure-update.totally-fake.net/verify-now"
+        }
+    },
+]
+
+# Static templates للـ Assessment (Other) — 5 phishing + 5 legit
+OTHER_ASSESS_PHISHING = [
+    # Admin
+    {
+        "email_type": "Payroll Phishing",
+        "from": "Payroll System <noreply@hr-payroll-update.xyz>",
+        "to": "m.abdullah.alqahtani@hospital.org",
+        "subject": "ACTION REQUIRED: Verify Your Bank Details to Receive Salary",
+        "attachment": "",
+        "body": "Dear Staff,\n\nYour salary for this month cannot be processed due to a system update.\n\nPlease verify your IBAN and bank details via the link below before end of day to avoid salary delay:\nhttps://hr-payroll-update.xyz/verify\n\nFAILURE TO COMPLY WILL RESULT IN 30-DAY SALARY DELAY.\n\nHR Department",
+        "suspicious_text": "verify your IBAN and bank details via the link below",
+        "suspicious_link": "https://hr-payroll-update.xyz/verify",
+        "explanation": "Legitimate HR departments never ask employees to verify bank details via email links. The domain hr-payroll-update.xyz is not an official hospital domain."
+    },
+    # IT
+    {
+        "email_type": "VPN Phishing",
+        "from": "IT Security <noreply@hospital-vpn-update.net>",
+        "to": "t.yusuf.aljuhani@hospital.org",
+        "subject": "URGENT: Your VPN Access Will Be Terminated in 1 Hour",
+        "attachment": "",
+        "body": "Dear Staff,\n\nYour FortiClient VPN access is about to EXPIRE. You must re-authenticate IMEDIATLY.\n\nClick here to update your VPN credintials:\nhttps://hospital-vpn-update.net/reauth\n\nACT NOW OR LOSE NETWORK ACCESS TODAY.\n\nIT Security Team",
+        "suspicious_text": "Click here to update your VPN credintials",
+        "suspicious_link": "https://hospital-vpn-update.net/reauth",
+        "explanation": "The domain hospital-vpn-update.net is fake. Legitimate VPN re-authentication is done through official IT channels, not email links."
+    },
+    # Clinical
+    {
+        "email_type": "EMR Phishing",
+        "from": "EMR Support <support@emr-secure.net>",
+        "to": "dr.sarah.almutairi@hospital.org",
+        "subject": "URGENT: Access Your EMR Credintials NOW",
+        "attachment": "",
+        "body": "Dear Staff,\n\nOUR EMR SYSTEM REQUIRES YOU TO RE-VERIFY YOUR CREDINTIALS IMMEDIATELY.\n\nPLEASE CLICK THIS LINK TO UPDATE YOUR ACCOUNT:\nhttp://emr-secure.net/verify-now\n\nACT NOW! DEADLINE TODAY!\n\nEMR Support Team",
+        "suspicious_text": "PLEASE CLICK THIS LINK TO UPDATE YOUR ACCOUNT",
+        "suspicious_link": "http://emr-secure.net/verify-now",
+        "explanation": "The domain emr-secure.net is not the official hospital EMR system. Legitimate EMR systems never ask for credentials via email."
+    },
+    # Admin
+    {
+        "email_type": "Invoice Fraud",
+        "from": "MedSupply Co. <billing@medsupply-invoices.xyz>",
+        "to": "m.hind.alrashidi@hospital.org",
+        "subject": "OVERDUE: Medical Supply Invoice SAR 98,000 — Pay NOW",
+        "attachment": "Invoice_MedSupply_2024.pdf",
+        "body": "Dear Staff,\n\nYour payment for medical supplies (Order #MS-7823) is OVERDUE.\n\nAmount: SAR 98,000\n\nLogin to process payment:\nhttps://medsupply-invoices.xyz/pay\n\nEnter your credentials to complete payment. Account will be suspended if not paid TODAY.\n\nMedSupply Billing Team",
+        "suspicious_text": "Enter your credentials to complete payment",
+        "suspicious_link": "https://medsupply-invoices.xyz/pay",
+        "explanation": "Legitimate suppliers do not ask for login credentials to process invoices. The domain medsupply-invoices.xyz is not an official supplier domain."
+    },
+    # IT
+    {
+        "email_type": "SSL Phishing",
+        "from": "IT Dept <noreply@hospital-ssl-cert.net>",
+        "to": "t.lama.alumari@hospital.org",
+        "subject": "CRITICAL: Hospital Website SSL Certificate Expired TODAY",
+        "attachment": "",
+        "body": "Dear Staff,\n\nThe hospital website SSL certificate has EXPIRED TODAY.\n\nPlease renew it IMEDIATLY by clicking:\nhttps://hospital-ssl-cert.net/renew\n\nYou must enter your full admin credintials to complete renewal.\n\nIT Department",
+        "suspicious_text": "enter your full admin credintials to complete renewal",
+        "suspicious_link": "https://hospital-ssl-cert.net/renew",
+        "explanation": "SSL certificates are renewed by IT administrators through official channels, not via email links. The domain hospital-ssl-cert.net is fake."
+    },
+]
+
+OTHER_ASSESS_LEGIT = [
+    # Clinical
+    {
+        "email_type": "Legitimate",
+        "from": "Head Nurse <nurse.head@hospital.org>",
+        "to": "n.noura.alshamri@hospital.org",
+        "subject": "Next Week Shift Schedule Update",
+        "attachment": "",
+        "body": "Dear Staff,\n\nPlease find below the updated shift schedule for next week.\n\nMonday: Dr. Al-Zahrani (0800-1600), Nurse Al-Otaibi (0800-1600)\nTuesday: Dr. Al-Rashidi (0800-1600), Nurse Al-Harbi (1200-2000)\n\nIf you have any conflicts, please contact me by Thursday.\n\nBest regards,\nFatima Al-Zahrani\nHead Nurse\nfatima.alzahrani@hospital.org",
+        "suspicious_link": "",
+        "explanation": "This is a legitimate shift schedule email. It comes from an official @hospital.org address, contains no suspicious links, and makes no requests for credentials."
+    },
+    # Admin
+    {
+        "email_type": "Legitimate",
+        "from": "HR Department <hr@hospital.org>",
+        "to": "m.sultan.alghamdi@hospital.org",
+        "subject": "Upcoming Mandatory Fire Safety Training — June 22",
+        "attachment": "",
+        "body": "Dear Staff,\n\nThis is a reminder that mandatory Fire Safety and Emergency Evacuation training will take place on June 22, 2024 from 9:00 AM to 12:00 PM in Conference Room B.\n\nAll administrative staff are required to attend.\n\nFor any questions, please contact the HR department at hr@hospital.org or ext. 1234.\n\nBest regards,\nMohammed Al-Hussain\nHR Department\nhr@hospital.org",
+        "suspicious_link": "",
+        "explanation": "This is a legitimate training notification. It comes from the official @hospital.org domain, provides clear training details, and does not request any sensitive information."
+    },
+    # IT
+    {
+        "email_type": "Legitimate",
+        "from": "IT Department <it@hospital.org>",
+        "to": "t.rania.almalki@hospital.org",
+        "subject": "Scheduled Server Maintenance — Saturday 3:00 AM to 6:00 AM",
+        "attachment": "",
+        "body": "Dear Staff,\n\nWe would like to inform you that scheduled server maintenance will take place this Saturday between 3:00 AM and 6:00 AM.\n\nDuring this period, the following services will be temporarily unavailable:\n- EMR system\n- Staff intranet\n- Email (limited)\n\nNo action is required from your end. All systems will be restored automatically after maintenance.\n\nFor urgent support during maintenance, contact the IT helpdesk at ext. 5555.\n\nBest regards,\nIT Department\nit@hospital.org",
+        "suspicious_link": "",
+        "explanation": "This is a legitimate IT maintenance notice. It comes from the official @hospital.org domain, provides specific maintenance details, and requires no action or credentials from the recipient."
+    },
+    # Clinical
+    {
+        "email_type": "Legitimate",
+        "from": "Infection Control Team <ic@hospital.org>",
+        "to": "dr.sarah.almutairi@hospital.org",
+        "subject": "Updated Hand Hygiene Guidelines — Q2 2024",
+        "attachment": "",
+        "body": "Dear Clinical Staff,\n\nThe Infection Control Team has updated the Hand Hygiene guidelines in line with the latest MOH recommendations for Q2 2024.\n\nKey updates:\n- Alcohol-based hand rub to be used before and after every patient contact\n- Glove usage protocols updated for ICU and oncology wards\n- New hand hygiene audit schedule starting July 1\n\nPlease review the updated guidelines on the hospital intranet under Infection Control > Guidelines.\n\nFor questions, contact the Infection Control Team at ic@hospital.org.\n\nBest regards,\nDr. Sara Al-Mahmoud\nInfection Control Officer\nic@hospital.org",
+        "suspicious_link": "",
+        "explanation": "This is a legitimate infection control update. It comes from the official @hospital.org domain, refers staff to the official intranet, and requests no credentials or personal information."
+    },
+    # Admin
+    {
+        "email_type": "Legitimate",
+        "from": "Procurement Department <procurement@hospital.org>",
+        "to": "m.reem.alsabiei@hospital.org",
+        "subject": "Medical Supply Order #MS-2024-089 Confirmed and Dispatched",
+        "attachment": "",
+        "body": "Dear Staff,\n\nWe are pleased to confirm that your medical supply order has been processed and dispatched.\n\nOrder details:\n- Order Number: MS-2024-089\n- Items: Surgical gloves, sterile dressings, IV catheters\n- Estimated delivery: 3-5 business days\n\nIf you have any questions about your order, please contact the Procurement Department at procurement@hospital.org or ext. 2200.\n\nBest regards,\nSarah Al-Otaibi\nProcurement Officer\nprocurement@hospital.org",
+        "suspicious_link": "",
+        "explanation": "This is a legitimate order confirmation. It comes from the official @hospital.org domain, provides order details, and does not request any sensitive information or credentials."
+    },
+]
+
+
 def get_recipient(role, index, language):
     role_info = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
     _, _, role_type = role_info
-    if role_type == "other":
-        # يناوب: 0=admin, 1=it, 2=clinical, 3=admin, 4=it, 5=clinical
-        other_pool_map = {0:"admin", 1:"it", 2:"clinical",
-                          3:"admin", 4:"it",  5:"clinical"}
-        pool = EN_NAMES.get(other_pool_map.get(index % 6, "other"), EN_NAMES["other"])
-    else:
-        pool = EN_NAMES.get(role_type, EN_NAMES["clinical"])
+    pool = EN_NAMES.get(role_type, EN_NAMES["clinical"])
     return pool[index % len(pool)]
 
 PHISHING_SCENARIOS = [
@@ -272,31 +482,31 @@ FORCED_SCENARIOS = {
         {"en": "SCENARIO: Fake firewall policy update — send a malicious Word document claiming to contain a new mandatory firewall security policy requiring macro enablement.", "ar": "السيناريو: سياسة جدار ناري مزيفة — مستند Word يطلب تفعيل الماكرو."},
     ],
     "other": [
-        # ── سيناريو 0: ADMIN ─────────────────────────────────────
-        {"en": "SCENARIO TYPE: ADMINISTRATIVE. The recipient is a general hospital employee in the admin/billing department. MANDATORY: Use the recipient email address provided in the \"to\" field exactly as given — it starts with \'m.\' (admin pool). Generate a fake payroll/HR notification — claim the employee\'s salary is on hold until they update bank account details (IBAN) via a suspicious link. Vary: HR manager name, urgency deadline (end of month/within 48h/before 15th). NO attachment. Generic greeting: \'Dear Staff\' only.",
-         "ar": "نوع السيناريو: إداري. المستلم موظف عام في قسم الإدارة. استخدم عنوان البريد المحدد في حقل \'to\' كما هو. سيناريو: إشعار رواتب مزيف — الراتب موقوف حتى تحديث بيانات الحساب البنكي (الآيبان) عبر رابط مشبوه. غيّر اسم مدير الموارد البشرية والموعد في كل مرة. بدون مرفق."},
-        # ── سيناريو 1: IT ────────────────────────────────────────
-        {"en": "SCENARIO TYPE: INFORMATION TECHNOLOGY. The recipient is a general hospital employee in the IT/technical department. MANDATORY: Use the recipient email address provided in the \"to\" field exactly as given — it starts with \'t.\' (IT pool). Generate a fake hospital network/VPN security alert — claim the employee\'s network account has been flagged for suspicious activity and must re-verify credentials via suspicious portal link. Vary: alert type (account lockout/suspicious login/security breach), suspicious portal URL, ONE spelling mistake. Generic greeting: \'Dear Staff\' only.",
-         "ar": "نوع السيناريو: تقنية المعلومات. المستلم موظف عام في قسم تقنية المعلومات. استخدم عنوان البريد المحدد في حقل \'to\' كما هو. سيناريو: تنبيه أمني مزيف — الحساب معلّق بسبب نشاط مشبوه ويجب إعادة التحقق عبر رابط. غيّر نوع التنبيه والرابط في كل مرة."},
-        # ── سيناريو 2: CLINICAL ──────────────────────────────────
-        {"en": "SCENARIO TYPE: CLINICAL/MEDICAL. The recipient is a general hospital employee in the clinical department. MANDATORY: Use the recipient email address provided in the \"to\" field exactly as given — it starts with \'dr.\' or \'n.\' (clinical pool). Generate a fake MOH urgent health directive — impersonate Ministry of Health sending a critical infection control or vaccination update requiring all staff to confirm compliance by clicking a suspicious link. Vary: directive topic (MRSA/COVID/vaccination/antimicrobial resistance), MOH official name, suspicious link. Generic greeting: \'Dear Staff\' only.",
-         "ar": "نوع السيناريو: سريري/طبي. المستلم موظف عام في القسم السريري. استخدم عنوان البريد المحدد في حقل \'to\' كما هو. سيناريو: توجيه صحي عاجل مزيف من وزارة الصحة — تأكيد الامتثال عبر رابط مشبوه. غيّر الموضوع واسم المسؤول والرابط في كل مرة."},
-        # ── سيناريو 3: ADMIN ─────────────────────────────────────
-        {"en": "SCENARIO TYPE: ADMINISTRATIVE. The recipient is a general hospital employee in the admin/procurement department. MANDATORY: Use the recipient email address provided in the \"to\" field exactly as given — it starts with \'m.\' (admin pool). Generate a fake medical equipment supplier invoice — impersonate a supplier (MedSupply Co./Gulf Medical/Al-Rashid Medical) claiming urgent invoice of SAR 75,000–150,000 must be approved immediately. Vary: supplier name, equipment type (surgical/lab/radiology/ICU), invoice amount, PDF filename. Generic greeting: \'Dear Staff\' only.",
-         "ar": "نوع السيناريو: إداري. المستلم موظف عام في قسم الإدارة أو المشتريات. استخدم عنوان البريد المحدد في حقل \'to\' كما هو. سيناريو: فاتورة مورد معدات طبية مزيفة — موافقة عاجلة على فاتورة بقيمة 75,000-150,000 ريال. غيّر اسم المورد والمعدات والمبلغ في كل مرة."},
-        # ── سيناريو 4: IT ────────────────────────────────────────
-        {"en": "SCENARIO TYPE: INFORMATION TECHNOLOGY. The recipient is a general hospital employee in the IT department. MANDATORY: Use the recipient email address provided in the \"to\" field exactly as given — it starts with \'t.\' (IT pool). Generate a fake IT helpdesk alert — impersonate hospital IT support claiming employee\'s computer has a critical security issue and must click a link immediately to run a security scan. Vary: malware type, suspicious scan link URL, ONE spelling mistake. Generic greeting: \'Dear Staff\' only.",
-         "ar": "نوع السيناريو: تقنية المعلومات. المستلم موظف عام في قسم التقنية. استخدم عنوان البريد المحدد في حقل \'to\' كما هو. سيناريو: تنبيه مزيف من مكتب المساعدة — جهاز مصاب بفيروس يجب الضغط على رابط للفحص. غيّر نوع الفيروس والرابط في كل مرة."},
-        # ── سيناريو 5: CLINICAL ──────────────────────────────────
-        {"en": "SCENARIO TYPE: CLINICAL/MEDICAL. The recipient is a general hospital employee in the clinical department. MANDATORY: Use the recipient email address provided in the \"to\" field exactly as given — it starts with \'dr.\' or \'n.\' (clinical pool). Generate a fake hospital staff portal/scheduling system credential harvest — claim the staff scheduling system requires urgent re-verification of login credentials due to a system migration. Vary: system name (Staff Portal/Scheduling System/Hospital Portal), suspicious link URL, ONE spelling mistake (credintials OR urgant OR acces). Generic greeting: \'Dear Staff\' only.",
-         "ar": "نوع السيناريو: سريري/طبي. المستلم موظف عام في القسم السريري. استخدم عنوان البريد المحدد في حقل \'to\' كما هو. سيناريو: سرقة بيانات بوابة الموظفين أو نظام الجداول — إعادة التحقق بسبب ترحيل النظام. غيّر اسم النظام والرابط والخطأ الإملائي في كل مرة."},
+        # 0 — ADMIN: يطابق OTHER_JOB_PROFILES[0] (billing coordinator)
+        {"en": "ADMINISTRATIVE PHISHING — Billing/Payroll: Generate a fake HR payroll email claiming the employee's salary is ON HOLD until they update their IBAN/bank account details. MUST include: fake non-hospital domain, suspicious link to update bank details, deadline threat (end of month/48 hours). VARY each run: HR manager name, bank/IBAN detail type, deadline, suspicious URL. NEVER generate clinical or IT content.",
+         "ar": "تصيد إداري — رواتب: رسالة مزيفة من قسم الموارد البشرية تدّعي أن الراتب موقوف حتى تحديث بيانات الحساب البنكي (الآيبان). يجب تضمين: نطاق مزيف، رابط مشبوه للتحديث، تهديد بالموعد النهائي. غيّر في كل مرة: اسم مدير الموارد البشرية، نوع البيانات البنكية، الموعد، الرابط."},
+        # 1 — IT: يطابق OTHER_JOB_PROFILES[1] (network technician)
+        {"en": "IT/TECHNICAL PHISHING — VPN/Network: Generate a fake IT security alert claiming the employee's hospital network account has detected suspicious login activity and must be re-verified immediately via a suspicious portal. MUST include: fake IT security domain, suspicious portal link, account lockout threat. VARY each run: alert type (suspicious login/account breach/security incident), suspicious link URL, IT security officer name. NEVER generate clinical or administrative content.",
+         "ar": "تصيد تقني — VPN/شبكة: تنبيه أمني مزيف من قسم تقنية المعلومات يدّعي رصد نشاط مشبوه على حساب الموظف في الشبكة ويطلب إعادة التحقق فوراً. يجب تضمين: نطاق تقني مزيف، رابط بوابة مشبوهة، تهديد بتعليق الحساب. غيّر في كل مرة: نوع التنبيه، الرابط، اسم مسؤول الأمن."},
+        # 2 — CLINICAL: يطابق OTHER_JOB_PROFILES[2] (pharmacist/lab)
+        {"en": "CLINICAL PHISHING — Pharmacy/Lab System: Generate a fake pharmacy dispensing system or lab results portal credential harvest. Claim the employee's access to the pharmacy/lab system will be suspended unless they re-verify login credentials immediately. MUST include: fake pharmacy/lab system domain, suspicious credential update link, system suspension threat. VARY each run: system name (pharmacy dispensing/lab portal/medication system), fake domain, suspicious link. NEVER generate administrative or IT content.",
+         "ar": "تصيد سريري — نظام صيدلية/مختبر: سرقة بيانات دخول نظام الصيدلية أو بوابة نتائج المختبر. ادّعِ أن وصول الموظف للنظام سيتوقف ما لم يعيد التحقق من بيانات الدخول فوراً. يجب تضمين: نطاق مزيف لنظام صيدلية/مختبر، رابط مشبوه للتحديث، تهديد بتعليق النظام. غيّر في كل مرة: اسم النظام، النطاق المزيف، الرابط."},
+        # 3 — ADMIN: يطابق OTHER_JOB_PROFILES[3] (procurement officer)
+        {"en": "ADMINISTRATIVE PHISHING — Procurement/Supplier Invoice: Generate a fake urgent supplier invoice email claiming an overdue medical equipment payment (SAR 75,000–200,000) must be approved immediately via a supplier portal link. MUST include: fake supplier company name, suspicious invoice portal link, overdue payment threat. VARY each run: supplier name, equipment type (surgical/lab/radiology/ICU), invoice amount, PDF filename, suspicious portal URL. NEVER generate clinical or IT content.",
+         "ar": "تصيد إداري — مشتريات/فاتورة مورد: فاتورة مورد معدات طبية مزيفة تدّعي وجود مبلغ متأخر (75,000-200,000 ريال) يجب دفعه فوراً عبر بوابة المورد. يجب تضمين: اسم شركة مورد مزيف، رابط بوابة مزيف، تهديد بتعليق العقد. غيّر في كل مرة: اسم المورد، نوع المعدات، المبلغ، اسم ملف PDF، الرابط."},
+        # 4 — IT: يطابق OTHER_JOB_PROFILES[4] (sysadmin)
+        {"en": "IT/TECHNICAL PHISHING — Server/Firewall/CIO: Generate a fake CIO or IT Director impersonation email urgently requesting the employee to provide admin server credentials or disable a security setting immediately. MUST be pure social engineering (no link needed). VARY each run: executive name/title (CIO/CISO/IT Director), specific system (firewall/server/database/Active Directory), urgency reason. NEVER generate clinical or administrative content.",
+         "ar": "تصيد تقني — خادم/جدار ناري/انتحال مدير: انتحال هوية مدير تقنية المعلومات أو المدير التنفيذي للتقنية يطلب تزويده ببيانات دخول الخادم أو تعطيل إعداد أمني فوراً. هندسة اجتماعية بحتة. غيّر في كل مرة: اسم ولقب المدير، النظام المحدد، سبب الاستعجال."},
+        # 5 — CLINICAL: يطابق OTHER_JOB_PROFILES[5] (radiologist)
+        {"en": "CLINICAL PHISHING — PACS/Radiology System: Generate a fake PACS imaging system or radiology portal credential harvest. Claim urgent patient scan results require the employee to log in via a suspicious link, or that the radiology system requires immediate credential re-verification. MUST include: fake radiology/PACS domain, suspicious link, patient urgency. VARY each run: system name (PACS/radiology portal/imaging system), fake domain, patient case reference, suspicious link. NEVER generate administrative or IT content.",
+         "ar": "تصيد سريري — نظام PACS/أشعة: سرقة بيانات دخول نظام التصوير الطبي أو بوابة الأشعة. ادّعِ أن نتائج أشعة مريض عاجلة تتطلب تسجيل الدخول عبر رابط مشبوه، أو أن النظام يحتاج إعادة التحقق الفوري. يجب تضمين: نطاق أشعة مزيف، رابط مشبوه، إلحاح حالة مريض. غيّر في كل مرة: اسم النظام، النطاق، رقم الحالة، الرابط."},
     ],
 }
 
 # FIX 1: build_prompt — upgraded to llama-3.3-70b-versatile
 # and enhanced difficulty rules with more detail
 # =============================================================
-def build_prompt(role, index, language, recipient="employee@hospital.org"):
+def build_prompt(role, index, language):
     is_ar      = (language == "Arabic")
     difficulty = st.session_state.get("difficulty", "medium")
     role_info  = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
@@ -336,7 +546,64 @@ def build_prompt(role, index, language, recipient="employee@hospital.org"):
             "Use the MANDATORY SCENARIO provided — it rotates across all three role types for maximum variety."
         ),
     }
-    r_desc, r_ctx, r_guidance = role_guidance.get(role_type, role_guidance["other"])
+
+    # للـ Other: نحدد وظيفة دقيقة + قسم محدد + بريد مناسب لكل index
+    OTHER_JOB_PROFILES = [
+        # 0 — Admin
+        {
+            "r_desc": "a hospital billing and insurance coordinator (administrative staff)",
+            "r_ctx": "payroll, IBAN updates, health insurance (Tawuniya/Bupa/AXA), supplier invoices, procurement, hospital billing, staff HR notifications",
+            "r_guidance": "Generate an ADMINISTRATIVE phishing email. Topic MUST be one of: fake payroll/IBAN update, fake health insurance verification, fake supplier invoice, fake CEO financial request, fake HR notification. NEVER use clinical or IT topics.",
+            "recipient": "m.sultan.alghamdi@hospital.org"
+        },
+        # 1 — IT
+        {
+            "r_desc": "a hospital network and systems support technician (IT staff)",
+            "r_ctx": "VPN access, hospital network accounts, SSL certificates, firewall, software licenses, IT helpdesk tickets, server maintenance, cybersecurity alerts",
+            "r_guidance": "Generate an IT/TECHNICAL phishing email. Topic MUST be one of: fake VPN re-authentication, fake SSL certificate expiry, fake network security alert, fake software license renewal, fake IT helpdesk request. NEVER use clinical or administrative topics.",
+            "recipient": "t.bandar.althubaiti@hospital.org"
+        },
+        # 2 — Clinical
+        {
+            "r_desc": "a hospital pharmacist or lab technician (clinical staff)",
+            "r_ctx": "pharmacy dispensing system, lab results portal, patient medication records, clinical protocols, MOH drug circulars, infection control updates",
+            "r_guidance": "Generate a CLINICAL phishing email. Topic MUST be one of: fake pharmacy/lab system credential update, fake MOH clinical protocol alert, fake patient records access, fake medical director request. NEVER use administrative or IT topics.",
+            "recipient": "dr.khalid.alanazi@hospital.org"
+        },
+        # 3 — Admin
+        {
+            "r_desc": "a hospital medical procurement and supply chain officer (administrative staff)",
+            "r_ctx": "medical equipment procurement, supplier contracts, purchase orders, delivery confirmations, inventory management, MOH procurement compliance",
+            "r_guidance": "Generate an ADMINISTRATIVE phishing email. Topic MUST be one of: fake urgent supplier invoice (SAR amount), fake procurement portal login, fake contract renewal, fake supply order confirmation with malicious attachment. NEVER use clinical or IT topics.",
+            "recipient": "m.reem.alsabiei@hospital.org"
+        },
+        # 4 — IT
+        {
+            "r_desc": "a hospital cybersecurity and systems administrator (IT staff)",
+            "r_ctx": "hospital firewall, server administration, database backups, endpoint security, Active Directory, cloud backup systems, EMR server maintenance",
+            "r_guidance": "Generate an IT/TECHNICAL phishing email. Topic MUST be one of: fake CIO/CISO urgent server request, fake firewall/security policy update, fake cloud backup credential alert, fake Active Directory password expiry, fake database admin request. NEVER use clinical or administrative topics.",
+            "recipient": "t.nadia.alsalmi@hospital.org"
+        },
+        # 5 — Clinical
+        {
+            "r_desc": "a hospital radiologist or medical imaging technician (clinical staff)",
+            "r_ctx": "PACS imaging system, radiology reports, patient scan results, imaging department scheduling, MOH radiology protocols, medical imaging equipment",
+            "r_guidance": "Generate a CLINICAL phishing email. Topic MUST be one of: fake PACS system credential update, fake urgent patient scan results PDF, fake radiology department alert, fake MOH imaging protocol update. NEVER use administrative or IT topics.",
+            "recipient": "dr.fahad.aldosari@hospital.org"
+        },
+    ]
+
+    _dummy_guidance = {
+    }
+    if role_type == "other":
+        profile = OTHER_JOB_PROFILES[index % len(OTHER_JOB_PROFILES)]
+        r_desc     = profile["r_desc"]
+        r_ctx      = profile["r_ctx"]
+        r_guidance = profile["r_guidance"]
+        # override الـ recipient للـ other حسب الـ profile
+        st.session_state[f"_other_recipient_{index}"] = profile["recipient"]
+    else:
+        r_desc, r_ctx, r_guidance = role_guidance.get(role_type, role_guidance["clinical"])
 
     # FIX 3: Enhanced difficulty rules — more detailed for both languages
     if is_ar:
@@ -447,13 +714,13 @@ This scenario is NON-NEGOTIABLE. Generate the email body, subject, and sender to
 
 ━━━ FORMAT RULES ━━━
 - body: plain text only, use \\n for line breaks, NO HTML
-- "to": MUST use EXACTLY this email address: {recipient} — do not change it
+- "to": email address only, nothing else
 - If attack uses a link: put URL in "suspicious_link" AND verbatim in body
 - If attack uses attachment: put filename in "attachment" (e.g. file.pdf, data.xlsx)
 - If social engineering only: "suspicious_link":"", "attachment":""
 
 ━━━ RETURN ONLY VALID JSON ━━━
-CRITICAL: Output ONLY the JSON. No text before or after it. No notes, no explanations, no extra sentences after the closing brace.
+CRITICAL: Output ONLY the JSON. No text before or after.
 {{"email_type":"attack type name","from":"{from_ex}","to":"employee@hospital.org","subject":"subject line","attachment":"filename or empty","body":"{body_ex}","suspicious_text":"most suspicious phrase","suspicious_link":"url or empty","indicators":[{{"number":1,"title":"{ind_t_ex}","description":"{ind_d_ex}"}},{{"number":2,"title":"{ind_t_ex}","description":"{ind_d_ex}"}},{{"number":3,"title":"{ind_t_ex}","description":"{ind_d_ex}"}}],"why_risky":"why dangerous for this role","learning_tip":"practical tip for this role"}}"""
 
 # =============================================================
@@ -621,7 +888,7 @@ def build_assess_prompt(role, index, is_phishing, language):
         },
         "it": {
             True: [
-                "MANDATORY PHISHING — IT/Helpdesk: Fake IT helpdesk ticket — claim a critical server/EMR performance issue requires IT specialist to verify credentials via suspicious link to allow remote diagnostics. Vary: ticket reference number, reported issue (EMR server slow/network outage/database error), suspicious link URL, requester name. Target: IT specialist.",
+                "MANDATORY PHISHING — IT/VPN: Fake VPN re-authentication alert. Vary: VPN name (Cisco AnyConnect/FortiClient/Pulse Secure/GlobalProtect), suspicious portal URL, urgency reason (security update/certificate renewal/mandatory re-auth). Target: IT specialist.",
                 "MANDATORY PHISHING — IT/SSL: Fake SSL certificate expiry for hospital system. Vary: affected system (hospital website/patient portal/EMR login/staff intranet/lab system), renewal deadline, suspicious link URL. Target: system administrator.",
                 "MANDATORY PHISHING — IT/Helpdesk: Fake helpdesk ticket requesting remote access or credentials. Vary: ticket reference number, reported issue (server outage/network fault/EMR performance), requester name. Target: IT helpdesk staff.",
                 "MANDATORY PHISHING — IT/CIO: CIO or CISO impersonation — urgent server credentials or disable security settings. Vary: executive name, specific system (firewall/server/database), urgency reason. Pure social engineering. Target: IT specialist.",
@@ -812,7 +1079,6 @@ FORMAT: body=plain text only, \\n for line breaks, no HTML. "to"=email address o
 {"If legitimate: use real official domain (@hospital.org or @moh.gov.sa), no suspicious links, no urgent credential requests.' " if not is_phishing else ""}
 
 RETURN ONLY VALID JSON:
-CRITICAL: Output ONLY the JSON object. No text before or after. Start with {{ end with }}.
 {{"is_phishing":{"true" if is_phishing else "false"},"from":"{from_ex}","to":"employee@hospital.org","subject":"{subj_ex}","attachment":"","body":"{body_ex}","suspicious_link":"","explanation":"{expl}"}}"""
 
 def get_system_prompt():
@@ -1055,10 +1321,95 @@ def clean_result(result, is_arabic):
         result["suspicious_link"] = sl
     return result
 
-def generate_email(role, index, language):
+
+def build_other_analysis_prompt(email_data, language, difficulty):
+    """يطلب من اللـ LLM الـ AI Analysis فقط للإيميل الجاهز"""
+    is_ar = (language == "ar")
+    body_preview = email_data["body"][:300].replace('"', "'")
+    
+    lang_rule = "Respond entirely in Arabic." if is_ar else "Respond entirely in English."
+    
+    diff_hints = {
+        "easy": "indicators should be obvious and clear for beginners",
+        "medium": "indicators should be moderately detailed",
+        "hard": "indicators should be subtle and detailed for advanced learners"
+    }
+    diff_hint = diff_hints.get(difficulty, diff_hints["medium"])
+    
+    return f"""You are a cybersecurity expert analyzing a phishing email for hospital staff awareness training.
+
+{lang_rule}
+
+Here is the phishing email to analyze:
+FROM: {email_data["from"]}
+SUBJECT: {email_data["subject"]}
+BODY PREVIEW: {body_preview}
+
+Your task: Generate ONLY the AI Tutor Analysis for this email.
+Difficulty hint: {diff_hint}
+
+RETURN ONLY VALID JSON — no text before or after:
+{{"indicators":[{{"number":1,"title":"indicator title","description":"detailed explanation"}},{{"number":2,"title":"indicator title","description":"detailed explanation"}},{{"number":3,"title":"indicator title","description":"detailed explanation"}}],"why_risky":"why this specific phishing email is dangerous for hospital staff","learning_tip":"practical tip for hospital staff to avoid this attack"}}"""
+
+
+def generate_other_email(index, language, difficulty):
+    """يولّد إيميل Other من الـ static template ويضيف AI Analysis"""
+    import copy
+    template = copy.deepcopy(OTHER_TEMPLATES[index % len(OTHER_TEMPLATES)])
+    email_data = template["email"]
+    
+    # نطلب الـ AI Analysis من اللـ LLM
     try:
-        recip = get_recipient(role, index, language)
-        data = call_groq(build_prompt(role, index, language, recipient=recip))
+        prompt = build_other_analysis_prompt(email_data, language, difficulty)
+        analysis = call_groq(prompt)
+        
+        # ندمج الإيميل الجاهز مع الـ analysis
+        email_data["indicators"] = analysis.get("indicators", [
+            {"number": 1, "title": "Suspicious Domain", "description": "The sender's domain is clearly fake and not affiliated with the hospital."},
+            {"number": 2, "title": "Aggressive Urgency", "description": "The email uses ALL-CAPS and threatening language to pressure the recipient."},
+            {"number": 3, "title": "Request for Credentials", "description": "Legitimate systems never ask for passwords or credentials via email."}
+        ])
+        email_data["why_risky"] = analysis.get("why_risky", "This phishing email targets hospital staff to steal sensitive credentials.")
+        email_data["learning_tip"] = analysis.get("learning_tip", "Always verify the sender's domain and never click suspicious links in emails.")
+        email_data["email_type"] = email_data.get("email_type", "Phishing")
+        
+    except Exception:
+        # Fallback analysis
+        email_data["indicators"] = [
+            {"number": 1, "title": "Suspicious Domain", "description": "The sender domain is not the official hospital domain."},
+            {"number": 2, "title": "Spelling Mistakes", "description": "The email contains obvious spelling mistakes unusual for official communications."},
+            {"number": 3, "title": "Aggressive Urgency", "description": "The email uses ALL-CAPS and threats to pressure immediate action."}
+        ]
+        email_data["why_risky"] = "This phishing email attempts to steal hospital staff credentials."
+        email_data["learning_tip"] = "Always verify the sender domain before clicking any link or sharing credentials."
+    
+    return email_data
+
+
+def generate_other_assess_email(index, is_phishing, language, difficulty):
+    """يولّد إيميل Other للاختبار من static template"""
+    import copy
+    if is_phishing:
+        email_data = copy.deepcopy(OTHER_ASSESS_PHISHING[index % len(OTHER_ASSESS_PHISHING)])
+        explanation = email_data.pop("explanation", "")
+        email_data["is_phishing"] = True
+    else:
+        email_data = copy.deepcopy(OTHER_ASSESS_LEGIT[index % len(OTHER_ASSESS_LEGIT)])
+        explanation = email_data.pop("explanation", "")
+        email_data["is_phishing"] = False
+    
+    email_data["explanation"] = explanation
+    return email_data
+
+
+def generate_email(role, index, language, difficulty="medium"):
+    # للـ Other: استخدم static templates مباشرة
+    role_info = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
+    _, _, role_type = role_info
+    if role_type == "other":
+        return generate_other_email(index, language, difficulty)
+    try:
+        data = call_groq(build_prompt(role, index, language))
         if "error" in data:
             return {"error": data['error'].get('message', str(data['error']))}
         if "choices" not in data:
@@ -1076,7 +1427,12 @@ def generate_email(role, index, language):
     except Exception as e:
         return {"error": str(e)}
 
-def generate_assess_email(role, index, is_phishing, language):
+def generate_assess_email(role, index, is_phishing, language, difficulty="medium"):
+    # للـ Other: استخدم static templates مباشرة
+    role_info = ROLE_MAP.get(role, ROLE_MAP.get("Clinical"))
+    _, _, role_type = role_info
+    if role_type == "other":
+        return generate_other_assess_email(index, is_phishing, language, difficulty)
     # FIX 2: max_tokens raised from 800 to 1200
     for attempt in range(3):
         try:
